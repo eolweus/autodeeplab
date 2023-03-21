@@ -1,0 +1,16 @@
+name: autodl
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - python=3
+  - pytorch=1.1.0
+  - torchvision
+  - pip
+  - pip:
+      - tensorboardX
+      - pycocotools
+      - tqdm
+      - numpy
+      - pandas
+      - apex
