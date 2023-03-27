@@ -16,7 +16,7 @@ class ChipFolderClassificationDataset(DatasetFolder):
             extensions=(".jp2",),
             transform=transform,
             target_transform=target_transform)
-        
+
     def find_classes(self, root):
         return ["negative", "positive"], {"negative": 0, "positive": 1}
 
@@ -27,10 +27,11 @@ class ChipFolderClassificationDataset(DatasetFolder):
 
 
 class ChipFolderSegmentationDataset(Dataset):
-    def __init__(self, root: str, transform=None) -> None:
+    def __init__(self, args, root: str, transform=None) -> None:
         super().__init__()
         self.root = Path(root)
         self.transform = transform
+        self.args = args
 
         self.chips = []
         for path in self.root.glob("positive/*.jp2"):
