@@ -30,6 +30,7 @@ print('cudnn version: {}'.format(torch.backends.cudnn.version()))
 
 torch.backends.cudnn.benchmark = True
 
+
 class Trainer(object):
     def __init__(self, args):
         self.args = args
@@ -43,36 +44,41 @@ class Trainer(object):
         self.use_amp = True if (APEX_AVAILABLE and args.use_amp) else False
         self.opt_level = args.opt_level
 
-        kwargs = {'num_workers': args.workers, 'pin_memory': True, 'drop_last':True}
-        self.train_loaderA, self.train_loaderB, self.val_loader, self.test_loader, self.nclass = make_data_loader(args, **kwargs)
+        kwargs = {'num_workers': args.workers,
+                  'pin_memory': True, 'drop_last': True}
+        self.train_loaderA, self.train_loaderB, self.val_loader, self.test_loader, self.nclass = make_data_loader(
+            args, **kwargs)
 
         if args.use_balanced_weights:
-            classes_weights_path = os.path.join(Path.db_root_dir(args.dataset), args.dataset+'_classes_weights.npy')
+            classes_weights_path = os.path.join(Path.db_root_dir(
+                args.dataset), args.dataset + '_classes_weights.npy')
             if os.path.isfile(classes_weights_path):
                 weight = np.load(classes_weights_path)
             else:
                 raise NotImplementedError
-                #if so, which trainloader to use?
+                # if so, which trainloader to use?
                 # weight = calculate_weigths_labels(args.dataset, self.train_loader, self.nclass)
             weight = torch.from_numpy(weight.astype(np.float32))
         else:
             weight = None
-        self.criterion = SegmentationLosses(weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
+        self.criterion = SegmentationLosses(
+            weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
 
         # Define network
-        model = AutoDeeplab (self.nclass, 12, self.criterion, self.args.filter_multiplier,
-                             self.args.block_multiplier, self.args.step)
+        model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
+                            self.args.block_multiplier, self.args.step)
         optimizer = torch.optim.SGD(
-                model.weight_parameters(),
-                args.lr,
-                momentum=args.momentum,
-                weight_decay=args.weight_decay
-            )
+            model.weight_parameters(),
+            args.lr,
+            momentum=args.momentum,
+            weight_decay=args.weight_decay
+        )
 
         self.model, self.optimizer = model, optimizer
 
         self.architect_optimizer = torch.optim.Adam(self.model.arch_parameters(),
-                                                    lr=args.arch_lr, betas=(0.9, 0.999),
+                                                    lr=args.arch_lr, betas=(
+                                                        0.9, 0.999),
                                                     weight_decay=args.arch_weight_decay)
 
         # Define Evaluator
@@ -85,10 +91,10 @@ class Trainer(object):
         if args.cuda:
             self.model = self.model.cuda()
 
-
         # mixed precision
         if self.use_amp and args.cuda:
-            keep_batchnorm_fp32 = True if (self.opt_level == 'O2' or self.opt_level == 'O3') else None
+            keep_batchnorm_fp32 = True if (
+                self.opt_level == 'O2' or self.opt_level == 'O3') else None
 
             # fix for current pytorch version with opt_level 'O1'
             if self.opt_level == 'O1' and torch.__version__ < '1.3':
@@ -106,31 +112,34 @@ class Trainer(object):
 
             # print(keep_batchnorm_fp32)
             self.model, [self.optimizer, self.architect_optimizer] = amp.initialize(
-                self.model, [self.optimizer, self.architect_optimizer], opt_level=self.opt_level,
+                self.model, [self.optimizer,
+                             self.architect_optimizer], opt_level=self.opt_level,
                 keep_batchnorm_fp32=keep_batchnorm_fp32, loss_scale="dynamic")
 
             print('cuda finished')
 
-
         # Using data parallel
-        if args.cuda and len(self.args.gpu_ids) >1:
+        if args.cuda and len(self.args.gpu_ids) > 1:
             if self.opt_level == 'O2' or self.opt_level == 'O3':
-                print('currently cannot run with nn.DataParallel and optimization level', self.opt_level)
-            self.model = torch.nn.DataParallel(self.model, device_ids=self.args.gpu_ids)
+                print(
+                    'currently cannot run with nn.DataParallel and optimization level', self.opt_level)
+            self.model = torch.nn.DataParallel(
+                self.model, device_ids=self.args.gpu_ids)
             patch_replication_callback(self.model)
             print('training on multiple-GPUs')
 
         #checkpoint = torch.load(args.resume)
         #print('about to load state_dict')
-        #self.model.load_state_dict(checkpoint['state_dict'])
+        # self.model.load_state_dict(checkpoint['state_dict'])
         #print('model loaded')
-        #sys.exit()
+        # sys.exit()
 
         # Resuming checkpoint
         self.best_pred = 0.0
         if args.resume is not None:
             if not os.path.isfile(args.resume):
-                raise RuntimeError("=> no checkpoint found at '{}'" .format(args.resume))
+                raise RuntimeError(
+                    "=> no checkpoint found at '{}'" .format(args.resume))
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
 
@@ -148,15 +157,17 @@ class Trainer(object):
             else:
                 if torch.cuda.device_count() > 1 or args.load_parallel:
                     # self.model.module.load_state_dict(checkpoint['state_dict'])
-                    copy_state_dict(self.model.module.state_dict(), checkpoint['state_dict'])
+                    copy_state_dict(self.model.module.state_dict(),
+                                    checkpoint['state_dict'])
                 else:
                     # self.model.load_state_dict(checkpoint['state_dict'])
-                    copy_state_dict(self.model.state_dict(), checkpoint['state_dict'])
-
+                    copy_state_dict(self.model.state_dict(),
+                                    checkpoint['state_dict'])
 
             if not args.ft:
                 # self.optimizer.load_state_dict(checkpoint['optimizer'])
-                copy_state_dict(self.optimizer.state_dict(), checkpoint['optimizer'])
+                copy_state_dict(self.optimizer.state_dict(),
+                                checkpoint['optimizer'])
             self.best_pred = checkpoint['best_pred']
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
@@ -189,7 +200,7 @@ class Trainer(object):
                 search = next(iter(self.train_loaderB))
                 image_search, target_search = search['image'], search['label']
                 if self.args.cuda:
-                    image_search, target_search = image_search.cuda (), target_search.cuda ()
+                    image_search, target_search = image_search.cuda(), target_search.cuda()
 
                 self.architect_optimizer.zero_grad()
                 output_search = self.model(image_search)
@@ -208,11 +219,13 @@ class Trainer(object):
             # Show 10 * 3 inference results each epoch
             if i % (num_img_tr // 10) == 0:
                 global_step = i + num_img_tr * epoch
-                self.summary.visualize_image(self.writer, self.args.dataset, image, target, output, global_step)
+                self.summary.visualize_image(
+                    self.writer, self.args.dataset, image, target, output, global_step)
 
-            #torch.cuda.empty_cache()
+            # torch.cuda.empty_cache()
         self.writer.add_scalar('train/total_loss_epoch', train_loss, epoch)
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print('[Epoch: %d, numImages: %5d]' %
+              (epoch, i * self.args.batch_size + image.data.shape[0]))
         print('Loss: %.3f' % train_loss)
 
         if self.args.no_val:
@@ -228,7 +241,6 @@ class Trainer(object):
                 'optimizer': self.optimizer.state_dict(),
                 'best_pred': self.best_pred,
             }, is_best)
-
 
     def validation(self, epoch):
         self.model.eval()
@@ -262,8 +274,10 @@ class Trainer(object):
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
         print('Validation:')
-        print('[Epoch: %d, numImages: %5d]' % (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(Acc, Acc_class, mIoU, FWIoU))
+        print('[Epoch: %d, numImages: %5d]' %
+              (epoch, i * self.args.batch_size + image.data.shape[0]))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(
+            Acc, Acc_class, mIoU, FWIoU))
         print('Loss: %.3f' % test_loss)
         new_pred = mIoU
         if new_pred > self.best_pred:
@@ -280,6 +294,7 @@ class Trainer(object):
                 'best_pred': self.best_pred,
             }, is_best)
 
+
 def main():
     args = obtain_search_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()
@@ -287,7 +302,8 @@ def main():
         try:
             args.gpu_ids = [int(s) for s in args.gpu_ids.split(',')]
         except ValueError:
-            raise ValueError('Argument --gpu_ids must be a comma-separated list of integers only')
+            raise ValueError(
+                'Argument --gpu_ids must be a comma-separated list of integers only')
 
     if args.sync_bn is None:
         if args.cuda and len(args.gpu_ids) > 1:
@@ -301,7 +317,7 @@ def main():
             'coco': 30,
             'cityscapes': 40,
             'pascal': 50,
-            'kd':10
+            'kd': 10
         }
         args.epochs = epoches[args.dataset.lower()]
 
@@ -313,9 +329,8 @@ def main():
 
     #args.lr = args.lr / (4 * len(args.gpu_ids)) * args.batch_size
 
-
     if args.checkname is None:
-        args.checkname = 'deeplab-'+str(args.backbone)
+        args.checkname = 'deeplab-' + str(args.backbone)
     print(args)
     torch.manual_seed(args.seed)
     trainer = Trainer(args)
@@ -328,5 +343,6 @@ def main():
 
     trainer.writer.close()
 
+
 if __name__ == "__main__":
-   main()
+    main()
