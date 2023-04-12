@@ -21,6 +21,7 @@ utils/__pycache__/copy_state_dict.cpython-37.pyc
 .idea/
 /.idea/
 dataloaders/__pycache__/
+/data
 */__pycache__/
 __pycache__/*
 .vscode/launch.json
