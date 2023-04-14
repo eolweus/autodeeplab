@@ -15,12 +15,14 @@ from utils.metrics import Evaluator
 from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
-import apex
-try:
-    from apex import amp
-    APEX_AVAILABLE = True
-except ModuleNotFoundError:
-    APEX_AVAILABLE = False
+# TODO: appears that this is deprecated. Use torch.cuda.amp instead
+# https://pytorch.org/docs/stable/amp.html
+# import apex
+# try:
+#     from apex import amp
+#     APEX_AVAILABLE = True
+# except ModuleNotFoundError:
+APEX_AVAILABLE = False
 
 
 print('working with pytorch version {}'.format(torch.__version__))
@@ -317,7 +319,8 @@ def main():
             'coco': 30,
             'cityscapes': 40,
             'pascal': 50,
-            'kd': 10
+            'kd': 10,
+            'solis': 10,
         }
         args.epochs = epoches[args.dataset.lower()]
 
