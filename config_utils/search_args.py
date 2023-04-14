@@ -2,7 +2,8 @@ import argparse
 
 
 def obtain_search_args():
-    parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
+    parser = argparse.ArgumentParser(
+        description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
                         choices=['resnet', 'xception', 'drn', 'mobilenet'],
                         help='backbone name (default: resnet)')
@@ -35,6 +36,7 @@ def obtain_search_args():
     parser.add_argument('--loss-type', type=str, default='ce',
                         choices=['ce', 'focal'],
                         help='loss func type (default: ce)')
+    parser.add_argument('--dist', type=bool, default=False)
     # training hyper params
     parser.add_argument('--epochs', type=int, default=None, metavar='N',
                         help='number of epochs to train (default: auto)')
