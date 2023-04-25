@@ -11,6 +11,7 @@ from PIL import Image, ImageOps, ImageFilter
 # only for solis dataset
 import torchvision.transforms.functional as F
 
+
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
     Args:
@@ -103,7 +104,8 @@ class RandomScaleCrop(object):
         img = sample['image']
         mask = sample['label']
         # random scale (short edge)
-        short_size = random.randint(int(self.base_size * 0.5), int(self.base_size * 2.0))
+        short_size = random.randint(
+            int(self.base_size * 0.5), int(self.base_size * 2.0))
         w, h = img.size
         if h > w:
             ow = short_size
@@ -118,7 +120,8 @@ class RandomScaleCrop(object):
             padh = self.crop_size - oh if oh < self.crop_size else 0
             padw = self.crop_size - ow if ow < self.crop_size else 0
             img = ImageOps.expand(img, border=(0, 0, padw, padh), fill=0)
-            mask = ImageOps.expand(mask, border=(0, 0, padw, padh), fill=self.fill)
+            mask = ImageOps.expand(mask, border=(
+                0, 0, padw, padh), fill=self.fill)
         # random crop crop_size
         w, h = img.size
         x1 = random.randint(0, w - self.crop_size)
@@ -229,13 +232,16 @@ class Retrain_Preprocess(object):
         if self.scale_range is not None:
             w, h = sample['image'].size
             rand_log_scale = math.log(self.scale_range[0], 2) + random.random() * \
-                (math.log(self.scale_range[1], 2) - math.log(self.scale_range[0], 2))
+                (math.log(self.scale_range[1], 2) -
+                 math.log(self.scale_range[0], 2))
             random_scale = math.pow(2, rand_log_scale)
-            new_size = (int(round(w * random_scale)), int(round(h * random_scale)))
+            new_size = (int(round(w * random_scale)),
+                        int(round(h * random_scale)))
             sample['image'] = sample['image'].resize(new_size, Image.ANTIALIAS)
             sample['label'] = sample['label'].resize(new_size, Image.NEAREST)
         sample['image'] = self.data_transforms(sample['image'])
-        sample['label'] = torch.LongTensor(np.array(sample['label']).astype(int64))
+        sample['label'] = torch.LongTensor(
+            np.array(sample['label']).astype(int64))
 
         if self.crop:
             image, mask = sample['image'], sample['label']
@@ -277,16 +283,16 @@ class transform_tr(object):
         return self.composed_transforms(sample)
 
 
-class transform_val(object):
-    def __init__(self, args, mean, std):
-        self.composed_transforms = transforms.Compose([
-            FixedResize(resize=args.resize),
-            FixScaleCrop(crop_size=args.crop_size),  # TODO:CHECK THIS
-            Normalize(mean, std),
-            ToTensor()])
+# class transform_val(object):
+#     def __init__(self, args, mean, std):
+#         self.composed_transforms = transforms.Compose([
+#             FixedResize(resize=args.resize),
+#             FixScaleCrop(crop_size=args.crop_size),  # TODO:CHECK THIS
+#             Normalize(mean, std),
+#             ToTensor()])
 
-    def __call__(self, sample):
-        return self.composed_transforms(sample)
+#     def __call__(self, sample):
+#         return self.composed_transforms(sample)
 
 
 class transform_val(object):
@@ -313,16 +319,20 @@ class transform_ts(object):
 
 class transform_retr(object):
     def __init__(self, args, mean, std):
-        crop_size = (args.crop_size, args.crop_size) if isinstance(args.crop_size, int) else args.crop_size
-        self.composed_transforms = Retrain_Preprocess(0.5, (0.5, 2), crop_size, mean, std)
+        crop_size = (args.crop_size, args.crop_size) if isinstance(
+            args.crop_size, int) else args.crop_size
+        self.composed_transforms = Retrain_Preprocess(
+            0.5, (0.5, 2), crop_size, mean, std)
 
     def __call__(self, sample):
         return self.composed_transforms(sample)
 
 
-class transform_reval(object):  # we use multi_scale evaluate in evaluate.py so dont need resize in dataset
+# we use multi_scale evaluate in evaluate.py so dont need resize in dataset
+class transform_reval(object):
     def __init__(self, args, mean, std):
-        self.composed_transforms = Retrain_Preprocess(None, None, None, mean, std)
+        self.composed_transforms = Retrain_Preprocess(
+            None, None, None, mean, std)
 
     def __call__(self, sample):
         return self.composed_transforms(sample)
