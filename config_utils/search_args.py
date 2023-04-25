@@ -13,7 +13,8 @@ def obtain_search_args():
     parser.add_argument('--out-stride', type=int, default=16,
                         help='network output stride (default: 8)')
     parser.add_argument('--dataset', type=str, default='cityscapes',
-                        choices=['pascal', 'coco', 'cityscapes', 'kd'],
+                        choices=['pascal', 'coco',
+                                 'cityscapes', 'kd', 'solis'],
                         help='dataset name (default: pascal)')
     parser.add_argument('--autodeeplab', type=str, default='search',
                         choices=['search', 'train'])

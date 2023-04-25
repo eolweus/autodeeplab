@@ -7,7 +7,8 @@ class Path:
         Returns the root directory of a specified dataset.
         """
         if dataset == "solis":
-            return "/data/l2a"
+            # TODO: Change this to your own path
+            return "/opt/data/copernicus"
         if dataset == "cityscapes":
             return "/home/erling/enernite/autodeeplab/data/cityscapes"
 

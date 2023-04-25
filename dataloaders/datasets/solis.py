@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-from pathlib import Path
+import pathlib
+from mypath import Path
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import DatasetFolder
 
@@ -27,9 +28,12 @@ class ChipFolderClassificationDataset(DatasetFolder):
 
 
 class ChipFolderSegmentationDataset(Dataset):
-    def __init__(self, args, root: str, transform=None) -> None:
+    NUM_CLASSES = 2
+
+    def __init__(self, args, root: Path.db_root_dir('solis'), transform=None) -> None:
+        # def __init__(self, args, root: str, transform=None) -> None:
         super().__init__()
-        self.root = Path(root)
+        self.root = pathlib.Path(root)
         self.transform = transform
         self.args = args
 
@@ -63,6 +67,6 @@ class ChipFolderSegmentationDataset(Dataset):
 
 
 if __name__ == "__main__":
-    dataset = ChipFolderSegmentationDataset("/data")
+    dataset = ChipFolderSegmentationDataset(0, "/opt/data/copernicus")
     for data, target in DataLoader(dataset, batch_size=16, num_workers=4, shuffle=True):
         print(data.shape, target.shape)

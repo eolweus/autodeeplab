@@ -8,6 +8,8 @@ import torchvision.transforms as transforms
 
 from PIL import Image, ImageOps, ImageFilter
 
+# only for solis dataset
+import torchvision.transforms.functional as F
 
 class Normalize(object):
     """Normalize a tensor image with mean and standard deviation.
@@ -324,3 +326,46 @@ class transform_reval(object):  # we use multi_scale evaluate in evaluate.py so 
 
     def __call__(self, sample):
         return self.composed_transforms(sample)
+
+
+#############################
+####### SOLIS DATASET #######
+#############################
+
+class SolisCompose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+    def __call__(self, *imgs):
+        for transform in self.transforms:
+            imgs = transform(*imgs)
+        return imgs
+
+
+class SolisNormalize:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, *imgs):
+        return F.normalize(imgs[0], self.mean, self.std, False), imgs[1]
+
+
+class SolisRandomHorizontalFlip:
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, *imgs):
+        if torch.rand(1) < self.p:
+            return tuple(map(F.hflip, imgs))
+        return imgs
+
+
+class SolisRandomVerticalFlip:
+    def __init__(self, p=0.5):
+        self.p = p
+
+    def __call__(self, *imgs):
+        if torch.rand(1) < self.p:
+            return tuple(map(F.vflip, imgs))
+        return imgs

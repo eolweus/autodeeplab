@@ -3,6 +3,7 @@ import numpy as np
 import torch.nn as nn
 from tqdm import tqdm
 from collections import OrderedDict
+from modeling.backbone.solis_models import autodeeplab50
 from mypath import Path
 from dataloaders import make_data_loader
 from modeling.sync_batchnorm.replicate import patch_replication_callback
@@ -15,6 +16,8 @@ from utils.metrics import Evaluator
 from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
+
+
 # TODO: appears that this is deprecated. Use torch.cuda.amp instead
 # https://pytorch.org/docs/stable/amp.html
 # import apex
@@ -67,8 +70,14 @@ class Trainer(object):
             weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
 
         # Define network
-        model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
-                            self.args.block_multiplier, self.args.step)
+        if args.dataset == 'solis':
+            backbone_module = torch.load('pre_trainedResnet50.pt')
+            model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
+                                self.args.block_multiplier, self.args.step, num_bands=12, backbone_module=backbone_module)
+        else:
+            model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
+                                self.args.block_multiplier, self.args.step)
+
         optimizer = torch.optim.SGD(
             model.weight_parameters(),
             args.lr,
@@ -184,7 +193,10 @@ class Trainer(object):
         tbar = tqdm(self.train_loaderA)
         num_img_tr = len(self.train_loaderA)
         for i, sample in enumerate(tbar):
-            image, target = sample['image'], sample['label']
+            if self.args.dataset == 'solis':
+                image, target = sample
+            else:
+                image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
             self.scheduler(self.optimizer, i, epoch, self.best_pred)
@@ -200,7 +212,10 @@ class Trainer(object):
 
             if epoch >= self.args.alpha_epoch:
                 search = next(iter(self.train_loaderB))
-                image_search, target_search = search['image'], search['label']
+                if self.args.dataset == 'solis':
+                    image_search, target_search = sample
+                else:
+                    image_search, target_search = search['image'], search['label']
                 if self.args.cuda:
                     image_search, target_search = image_search.cuda(), target_search.cuda()
 
@@ -237,6 +252,7 @@ class Trainer(object):
                 state_dict = self.model.module.state_dict()
             else:
                 state_dict = self.model.state_dict()
+            # TODO: mulig å få bare state_dict for autodl?
             self.saver.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': state_dict,
@@ -251,7 +267,10 @@ class Trainer(object):
         test_loss = 0.0
 
         for i, sample in enumerate(tbar):
-            image, target = sample['image'], sample['label']
+            if self.args.dataset == 'solis':
+                image, target = sample
+            else:
+                image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
             with torch.no_grad():
