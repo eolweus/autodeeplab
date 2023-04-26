@@ -208,19 +208,19 @@ class AutoDeeplab(nn.Module):
         self.level_8 = []
         self.level_16 = []
         self.level_32 = []
-        # if self.backbone is not None:
-        #     with torch.no_grad():
-        #         # ResNet backbone returns a dict with keys 'out' and 'aux'
-        #         # 'out' is the output of the last layer of the backbone
-        #         # 'aux' is the output of the layer before the last layer
-        #         # We only need 'out' for the decoder
-        #         temp = self.backbone(x)['out']
-        #         print(temp.shape)
-        #     self.level_4.append(self.stem2(temp))
-        # else:
-        temp = self.stem0(x)
-        temp = self.stem1(temp)
-        self.level_4.append(self.stem2(temp))
+        if self.backbone is not None:
+            with torch.no_grad():
+                # ResNet backbone returns a dict with keys 'out' and 'aux'
+                # 'out' is the output of the last layer of the backbone
+                # 'aux' is the output of the layer before the last layer
+                # We only need 'out' for the decoder
+                temp = self.backbone(x)['out']
+                print(temp.shape)
+            self.level_4.append(self.stem2(temp))
+        else:
+            temp = self.stem0(x)
+            temp = self.stem1(temp)
+            self.level_4.append(self.stem2(temp))
         # Solis
 
         count = 0
