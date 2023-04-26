@@ -11,7 +11,7 @@ from torchvision.models._utils import IntermediateLayerGetter
 
 
 class AutoDeeplab(nn.Module):
-    def __init__(self, num_classes, num_layers, criterion=None, filter_multiplier=8, block_multiplier=5, step=5, cell=cell_level_search.Cell, num_bands: int = 12, backbone_module: Optional[dict] = None):
+    def __init__(self, num_classes, num_layers, criterion=None, filter_multiplier=8, block_multiplier=5, step=5, cell=cell_level_search.Cell, num_bands: int = 3, backbone_module: Optional[dict] = None):
         super(AutoDeeplab, self).__init__()
 
         self.cells = nn.ModuleList()
@@ -22,6 +22,7 @@ class AutoDeeplab(nn.Module):
         self._filter_multiplier = filter_multiplier
         self._criterion = criterion
         self._initialize_alphas_betas()
+        self.num_bands = num_bands
         f_initial = int(self._filter_multiplier)
         half_f_initial = int(f_initial / 2)
 
@@ -64,7 +65,7 @@ class AutoDeeplab(nn.Module):
             self.backbone = None
 
         self.stem0 = nn.Sequential(
-            nn.Conv2d(3, half_f_initial * self._block_multiplier,
+            nn.Conv2d(num_bands, half_f_initial * self._block_multiplier,
                       3, stride=2, padding=1),
             nn.BatchNorm2d(half_f_initial * self._block_multiplier),
             nn.ReLU()
@@ -202,6 +203,7 @@ class AutoDeeplab(nn.Module):
     def forward(self, x):
         # TODO: GET RID OF THESE LISTS, we dont need to keep everything.
         # TODO: Is this the reason for the memory issue ?
+        # Check the chatgpt code above "benefits of avocado" for a better way to do this
         self.level_4 = []
         self.level_8 = []
         self.level_16 = []
@@ -218,7 +220,6 @@ class AutoDeeplab(nn.Module):
         # else:
         temp = self.stem0(x)
         temp = self.stem1(temp)
-        print(temp.shape)
         self.level_4.append(self.stem2(temp))
         # Solis
 

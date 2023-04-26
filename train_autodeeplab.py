@@ -13,6 +13,8 @@ from utils.lr_scheduler import LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
+# from auto_deeplab2 import AutoDeeplab
+# TODO: remember to use this instead of the auto_deeplab2
 from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
@@ -69,14 +71,12 @@ class Trainer(object):
         self.criterion = SegmentationLosses(
             weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
 
+        # Add backbone module if specified
+        backbone_module = torch.load(
+            'pre_trainedResnet50.pt') if args.backbone == 'solis_resnet50' else None
         # Define network
-        if args.dataset == 'solis':
-            backbone_module = torch.load('pre_trainedResnet50.pt')
-            model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
-                                self.args.block_multiplier, self.args.step, num_bands=12, backbone_module=backbone_module)
-        else:
-            model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
-                                self.args.block_multiplier, self.args.step)
+        model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
+                            self.args.block_multiplier, self.args.step, num_bands=args.num_bands, backbone_module=backbone_module)
 
         optimizer = torch.optim.SGD(
             model.weight_parameters(),
