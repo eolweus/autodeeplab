@@ -289,11 +289,14 @@ class Trainer(object):
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
+        F1 = self.evaluator.F1_score() if self.args.dataset == 'solis' else None
         self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
         self.writer.add_scalar('val/mIoU', mIoU, epoch)
         self.writer.add_scalar('val/Acc', Acc, epoch)
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
+        if self.args.dataset == 'solis':
+            self.writer.add_scalar('val/F1', F1, epoch)
         print('Validation:')
         print('[Epoch: %d, numImages: %5d]' %
               (epoch, i * self.args.batch_size + image.data.shape[0]))
