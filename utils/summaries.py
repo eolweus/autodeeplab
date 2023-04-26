@@ -17,11 +17,23 @@ class TensorboardSummary(object):
 
     def visualize_image(self, writer, dataset, image, target, output, global_step):
         if (self.use_dist and dist.get_rank() == 0) or not self.use_dist:
-            grid_image = make_grid(image[:3].clone().cpu().data, 3, normalize=True)
+            # TODO: this might be overkill
+            if image.shape[1] == 12:
+                image2 = image[:, :3, :, :].clone()
+                grid_image = make_grid(
+                    image2[:3].clone().cpu().data, 3, normalize=True)
+            else:
+                grid_image = make_grid(
+                    image[:3].clone().cpu().data, 3, normalize=True)
             writer.add_image('Image', grid_image, global_step)
             grid_image = make_grid(decode_seg_map_sequence(torch.max(output[:3], 1)[1].detach().cpu().numpy(),
                                                            dataset=dataset), 3, normalize=False, range=(0, 255))
+            # grid_image = make_grid(torch.max(output[:3], 1)[
+            #                        1].detach().cpu().numpy())
             writer.add_image('Predicted label', grid_image, global_step)
             grid_image = make_grid(decode_seg_map_sequence(torch.squeeze(target[:3], 1).detach().cpu().numpy(),
                                                            dataset=dataset), 3, normalize=False, range=(0, 255))
+            # grid_image = make_grid(torch.squeeze(
+            #     target[:3], 1).detach().cpu().numpy())
+
             writer.add_image('Groundtruth label', grid_image, global_step)

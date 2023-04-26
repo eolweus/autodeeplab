@@ -61,10 +61,10 @@ class ChipFolderClassificationDatamodule(pl.LightningDataModule):
 
 
 class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
-    def __init__(self, args, root: str = Path.db_root_dir('solis'), batch_size: int = 2, num_workers: int = 4):
+    def __init__(self, args, root: str = Path.db_root_dir('solis')):
         super().__init__()
-        self.batch_size = batch_size
-        self.num_workers = num_workers
+        self.batch_size = args.batch_size
+        self.num_workers = args.workers
 
         transform = SolisCompose([
             SolisNormalize(mean, std),

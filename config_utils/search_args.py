@@ -25,9 +25,9 @@ def obtain_search_args():
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--load-parallel', type=int, default=0)
     parser.add_argument('--clean-module', type=int, default=0)
-    parser.add_argument('--workers', type=int, default=0,
+    parser.add_argument('--workers', type=int, default=4,
                         metavar='N', help='dataloader threads')
-    parser.add_argument('--base_size', type=int, default=320,
+    parser.add_argument('--base_size', type=int, default=2,
                         help='base image size')
     parser.add_argument('--crop_size', type=int, default=321,
                         help='crop image size')

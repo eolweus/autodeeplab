@@ -56,7 +56,10 @@ class ChipFolderSegmentationDataset(Dataset):
 
         if self.chips[key][1]:
             with rasterio.open(self.chips[key][1]) as dataset:
-                target = torch.tensor(dataset.read(1).astype(np.float32))
+                target = torch.tensor(dataset.read(
+                    1).astype(np.float32))
+                # TODO: This is a hack to make the target binary. We should probably fix the data itself instead.
+                target = torch.clamp(target, 0, 1)
         else:
             target = torch.zeros(data.shape[1:], dtype=torch.float32)
 
