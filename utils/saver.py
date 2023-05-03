@@ -63,9 +63,9 @@ class Saver(object):
             p['lr_scheduler'] = self.args.lr_scheduler
             p['loss_type'] = self.args.loss_type
             p['epochs'] = self.args.epochs
-            p['alph_epoch'] = self.args.alph_epoch
+            p['alpha_epoch'] = self.args.alpha_epoch
             p['batch_size'] = self.args.batch_size
-            p['num_workers'] = self.args.num_workers
+            p['workers'] = self.args.workers
             p['resize'] = self.args.resize
             p['crop_size'] = self.args.crop_size
             p['num_images'] = self.args.num_images

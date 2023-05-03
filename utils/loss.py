@@ -9,30 +9,34 @@ class SegmentationLosses(object):
         self.weight = weight
         self.size_average = size_average
         self.cuda = cuda
+        self.batch_average = batch_average
 
     def build_loss(self, mode='ce'):
-        """Choices: ['ce' or 'focal']"""
+        """Choices: ['ce', 'focal' or 'sigmoid_focal']"""
         if mode == 'ce':
             return self.CrossEntropyLoss
         elif mode == 'focal':
             return self.FocalLoss
+        elif mode == 'sf':
+            return self.SigmoidFocalLoss
         else:
             raise NotImplementedError
 
     def CrossEntropyLoss(self, logit, target):
         n, c, h, w = logit.size()
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+        criterion = nn.CrossEntropyLoss(
+            weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
         if self.cuda:
             criterion = criterion.cuda()
 
         loss = criterion(logit, target.long())
 
-
         return loss
 
     def FocalLoss(self, logit, target, gamma=2, alpha=0.5):
         n, c, h, w = logit.size()
-        criterion = nn.CrossEntropyLoss(weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+        criterion = nn.CrossEntropyLoss(
+            weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
         if self.cuda:
             criterion = criterion.cuda()
 
@@ -41,6 +45,53 @@ class SegmentationLosses(object):
         if alpha is not None:
             logpt *= alpha
         loss = -((1 - pt) ** gamma) * logpt
+
+        if self.batch_average:
+            loss /= n
+
+        return loss
+
+    # def SigmoidFocalLoss(self, logit, target, gamma=2, alpha=0.5):
+    #     n, c, h, w = logit.size()
+    #     criterion = nn.BCEWithLogitsLoss(
+    #         weight=self.weight, reduction='mean')
+    #     if self.cuda:
+    #         criterion = criterion.cuda()
+
+    #     logpt = -criterion(logit, target)
+    #     pt = torch.exp(logpt)
+    #     if alpha is not None:
+    #         logpt *= alpha
+    #     loss = -((1 - pt) ** gamma) * logpt
+
+    #     if self.batch_average:
+    #         loss /= n
+
+    #     return loss
+    def SigmoidFocalLoss(self, logit, target, gamma=2, alpha=0.5):
+        n, c, h, w = logit.size()
+
+        if self.cuda:
+            target = target.cuda()
+
+        # Convert target to the same dimensions as logit
+        target = target.float().unsqueeze(1).expand_as(logit)
+
+        # Calculate the BCEWithLogitsLoss
+        criterion = nn.BCEWithLogitsLoss(reduction='none')
+        if self.cuda:
+            criterion = criterion.cuda()
+
+        logpt = -criterion(logit, target)
+        pt = torch.exp(logpt)
+
+        if alpha is not None:
+            logpt *= alpha
+
+        loss = -((1 - pt) ** gamma) * logpt
+
+        # Reduce the loss
+        loss = loss.mean()
 
         if self.batch_average:
             loss /= n
