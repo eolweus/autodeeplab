@@ -15,8 +15,9 @@ std = (548.34, 565.12, 584.81, 691.14, 730.98, 816.28,
        904.67, 950.83, 962.56, 1134.48, 943.07, 779.01)
 
 
+# Youre not using this one!
 class ChipFolderClassificationDatamodule(pl.LightningDataModule):
-    def __init__(self, root: Path.db_root_dir('solis'), batch_size: int = 128, num_workers: int = 4):
+    def __init__(self, root: Path.db_root_dir('solis'), batch_size: int = 128, num_workers: int = 4, num_images: int = None, subset_ratio: float = None):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -28,7 +29,7 @@ class ChipFolderClassificationDatamodule(pl.LightningDataModule):
         ])
 
         self.dataset = ChipFolderClassificationDataset(
-            root, transform=transform)
+            root, transform=transform, subset_ratio=subset_ratio, num_images=num_images)
 
         train_dataset_size = int(0.8 * len(self.dataset))
         val_dataset_size = len(self.dataset) - train_dataset_size
@@ -36,6 +37,9 @@ class ChipFolderClassificationDatamodule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset = torch.utils.data.random_split(
             self.dataset,
             [train_dataset_size, val_dataset_size])
+
+        print("Found %d %s images" % (train_dataset_size, "training"))
+        print("Found %d %s images" % (val_dataset_size, "validation"))
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(
@@ -81,6 +85,9 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset = torch.utils.data.random_split(
             self.dataset,
             [train_dataset_size, val_dataset_size])
+
+        print("Found %d %s images" % (train_dataset_size, "training"))
+        print("Found %d %s images" % (val_dataset_size, "validation"))
 
     def train_dataloader(self):
         return torch.utils.data.DataLoader(

@@ -4,12 +4,16 @@ import argparse
 def obtain_search_args():
     parser = argparse.ArgumentParser(
         description="PyTorch DeeplabV3Plus Training")
-    parser.add_argument('--backbone', type=str, default='resnet',
+    parser.add_argument('--backbone', type=str, default=None,
                         choices=['resnet', 'xception', 'drn',
                                  'mobilenet', 'solis_resnet50'],
                         help='backbone name (default: resnet)'),
     parser.add_argument('--num_bands', type=int,
                         default=3, help='number of bands')
+    parser.add_argument('--num_images', type=int,
+                        default=None, help='number of images from from solis dataset')
+    parser.add_argument('--subset_ratio', type=float,
+                        default=None, help='ratio of images from the total solis dataset')
     parser.add_argument('--opt_level', type=str, default='O0',
                         choices=['O0', 'O1', 'O2', 'O3'],
                         help='opt level for half percision training (default: O0)')

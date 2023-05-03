@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import pathlib
+import random
 from mypath import Path
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import DatasetFolder
@@ -7,6 +8,8 @@ from torchvision.datasets import DatasetFolder
 import numpy as np
 import rasterio
 import torch
+
+random.seed(42)
 
 
 class ChipFolderClassificationDataset(DatasetFolder):
@@ -31,21 +34,47 @@ class ChipFolderSegmentationDataset(Dataset):
     NUM_CLASSES = 2
 
     def __init__(self, args, root: Path.db_root_dir('solis'), transform=None) -> None:
-        # def __init__(self, args, root: str, transform=None) -> None:
         super().__init__()
         self.root = pathlib.Path(root)
         self.transform = transform
         self.args = args
 
-        self.chips = []
+        num_images = args.num_images or None
+        subset_ratio = args.subset_ratio or None
+
+        positive_chips = []
+        negative_chips = []
+
         for path in self.root.glob("positive/*.jp2"):
             target_path = self.root / "target" / f"{path.name}"
             if path.exists() and target_path.exists():
-                self.chips.append((path, target_path))
+                positive_chips.append((path, target_path))
 
         for path in self.root.glob("negative/*.jp2"):
             if path.exists():
-                self.chips.append((path, None))
+                negative_chips.append((path, None))
+
+        # Calculate subset_ratio based on the provided number of images
+        if num_images is not None:
+            random.shuffle(positive_chips)
+            random.shuffle(negative_chips)
+
+            positive_chips = positive_chips[:num_images // 2]
+            negative_chips = negative_chips[:num_images // 2]
+
+        # Shuffle and take a random subset of the specified size for positive and negative chips
+        elif subset_ratio is not None:
+            pos_subset_size = int(len(positive_chips) * subset_ratio)
+            neg_subset_size = int(len(negative_chips) * subset_ratio)
+
+            random.shuffle(positive_chips)
+            random.shuffle(negative_chips)
+
+            positive_chips = positive_chips[:pos_subset_size]
+            negative_chips = negative_chips[:neg_subset_size]
+
+        self.chips = positive_chips + negative_chips
+        random.shuffle(self.chips)
 
     def __len__(self):
         return len(self.chips)
