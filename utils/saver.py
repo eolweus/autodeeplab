@@ -12,10 +12,13 @@ class Saver(object):
         self.args = args
         self.use_dist = use_dist
         self.directory = os.path.join('run', args.dataset, args.checkname)
-        self.runs = sorted(glob.glob(os.path.join(self.directory, 'experiment_*')))
-        run_id = max([int(x.split('_')[-1]) for x in self.runs]) + 1 if self.runs else 0
+        self.runs = sorted(
+            glob.glob(os.path.join(self.directory, 'experiment_*')))
+        run_id = max([int(x.split('_')[-1])
+                     for x in self.runs]) + 1 if self.runs else 0
 
-        self.experiment_dir = os.path.join(self.directory, 'experiment_{}'.format(str(run_id)))
+        self.experiment_dir = os.path.join(
+            self.directory, 'experiment_{}'.format(str(run_id)))
         if not os.path.exists(self.experiment_dir):
             os.makedirs(self.experiment_dir)
 
@@ -32,7 +35,8 @@ class Saver(object):
                     previous_miou = [0.0]
                     for run in self.runs:
                         run_id = run.split('_')[-1]
-                        path = os.path.join(self.directory, 'experiment_{}'.format(str(run_id)), 'best_pred.txt')
+                        path = os.path.join(self.directory, 'experiment_{}'.format(
+                            str(run_id)), 'best_pred.txt')
                         if os.path.exists(path):
                             with open(path, 'r') as f:
                                 miou = float(f.readline())
@@ -41,9 +45,11 @@ class Saver(object):
                             continue
                     max_miou = max(previous_miou)
                     if best_pred > max_miou:
-                        shutil.copyfile(filename, os.path.join(self.directory, 'model_best.pth.tar'))
+                        shutil.copyfile(filename, os.path.join(
+                            self.directory, 'model_best.pth.tar'))
                 else:
-                    shutil.copyfile(filename, os.path.join(self.directory, 'model_best.pth.tar'))
+                    shutil.copyfile(filename, os.path.join(
+                        self.directory, 'model_best.pth.tar'))
 
     def save_experiment_config(self):
         if (self.use_dist and dist.get_rank() == 0) or not self.use_dist:
@@ -56,9 +62,14 @@ class Saver(object):
             p['lr'] = self.args.lr
             p['lr_scheduler'] = self.args.lr_scheduler
             p['loss_type'] = self.args.loss_type
-            p['epoch'] = self.args.epochs
+            p['epochs'] = self.args.epochs
+            p['alph_epoch'] = self.args.alph_epoch
+            p['batch_size'] = self.args.batch_size
+            p['num_workers'] = self.args.num_workers
             p['resize'] = self.args.resize
             p['crop_size'] = self.args.crop_size
+            p['num_images'] = self.args.num_images
+            p['subset_ratio'] = self.args.subset_ratio
 
             for key, val in p.items():
                 log_file.write(key + ':' + str(val) + '\n')
