@@ -19,6 +19,10 @@ from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
 
+import random
+
+random.seed(42)
+
 
 # TODO: appears that this is deprecated. Use torch.cuda.amp instead
 # https://pytorch.org/docs/stable/amp.html

@@ -70,7 +70,7 @@ class Saver(object):
             p['crop_size'] = self.args.crop_size
             p['num_images'] = self.args.num_images
             p['subset_ratio'] = self.args.subset_ratio
-
+            p['num_bands'] = self.args.num_bands
             for key, val in p.items():
                 log_file.write(key + ':' + str(val) + '\n')
             log_file.close()

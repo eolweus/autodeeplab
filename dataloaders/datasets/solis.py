@@ -8,6 +8,9 @@ from torchvision.datasets import DatasetFolder
 import numpy as np
 import rasterio
 import torch
+import warnings
+from rasterio.errors import NotGeoreferencedWarning
+
 
 random.seed(42)
 
@@ -80,8 +83,22 @@ class ChipFolderSegmentationDataset(Dataset):
         return len(self.chips)
 
     def __getitem__(self, key):
-        with rasterio.open(self.chips[key][0]) as dataset:
-            data = torch.tensor(dataset.read().astype(np.float32))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", NotGeoreferencedWarning)
+
+        # if self.args.num_bands == 3 only use band 4, 3 and 2 as red, green blue
+        if self.args.num_bands == 3:
+            with rasterio.open(self.chips[key][0]) as dataset:
+                data = torch.tensor(
+                    dataset.read([4, 3, 2]).astype(np.float32))
+        elif self.args.num_bands == 12:
+            # else use specified number of bands
+            with rasterio.open(self.chips[key][0]) as dataset:
+                data = torch.tensor(dataset.read().astype(np.float32))
+        else:
+            with rasterio.open(self.chips[key][0]) as dataset:
+                data = torch.tensor(
+                    dataset.read(list(range(1, self.args.num_bands + 1))).astype(np.float32))
 
         if self.chips[key][1]:
             with rasterio.open(self.chips[key][1]) as dataset:
