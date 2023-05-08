@@ -8,4 +8,6 @@ __pycache__/
 venv/
 pre_trainedResnet50.pt
 run/
+image_samples/
 
+nohup.out
