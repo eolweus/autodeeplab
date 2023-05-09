@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision.ops.focal_loss import sigmoid_focal_loss
 
 
 class SegmentationLosses(object):
@@ -12,7 +13,7 @@ class SegmentationLosses(object):
         self.batch_average = batch_average
 
     def build_loss(self, mode='ce'):
-        """Choices: ['ce', 'focal' or 'sigmoid_focal']"""
+        """Choices: ['ce', 'focal']"""
         if mode == 'ce':
             return self.CrossEntropyLoss
         elif mode == 'focal':
@@ -22,32 +23,89 @@ class SegmentationLosses(object):
 
     def CrossEntropyLoss(self, logit, target):
         n, c, h, w = logit.size()
+        reduction = 'mean' if self.size_average else 'none'
         criterion = nn.CrossEntropyLoss(
-            weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+            weight=self.weight, ignore_index=self.ignore_index, reduction=reduction)
         if self.cuda:
             criterion = criterion.cuda()
 
         loss = criterion(logit, target.long())
 
+        if self.batch_average and not self.size_average:
+            loss = loss.mean()
+
         return loss
 
-    def FocalLoss(self, logit, target, gamma=2, alpha=0.5):
-        n, c, h, w = logit.size()
-        criterion = nn.CrossEntropyLoss(
-            weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+    # def FocalLoss(self, logit, target, gamma=2, alpha=0.25):
+    #     n, c, h, w = logit.size()
+    #     criterion = nn.CrossEntropyLoss(
+    #         weight=self.weight, ignore_index=self.ignore_index, reduction='none')
+
+    #     if self.cuda:
+    #         criterion = criterion.cuda()
+
+    #     logpt = -criterion(logit, target.long())
+    #     pt = torch.exp(logpt)
+
+    #     # Create mask for positive samples (ignore_index is assumed to be negative)
+    #     mask = (target != self.ignore_index).float()
+    #     alpha_t = torch.ones_like(target) * alpha
+    #     alpha_t = alpha_t * mask
+
+    #     loss = -alpha_t * ((1 - pt) ** gamma) * logpt
+    #     # Apply mask to exclude the ignore_index samples from the loss
+    #     loss = loss * mask
+
+    #     if self.size_average:
+    #         loss = loss.sum() / mask.sum()  # Apply mean reduction based on the mask
+
+    #     if self.batch_average:
+    #         loss /= n
+
+    #     return loss
+
+    # def CrossEntropyLoss(self, logit, target):
+    #     n, c, h, w = logit.size()
+    #     criterion = nn.CrossEntropyLoss(
+    #         weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+    #     if self.cuda:
+    #         criterion = criterion.cuda()
+
+    #     loss = criterion(logit, target.long())
+
+    #     return loss
+
+    def FocalLoss(self, logit, target, gamma=2, alpha=0.25, reduction='mean'):
         if self.cuda:
-            criterion = criterion.cuda()
+            logit = logit.cuda()
+            target = target.cuda()
 
-        logpt = -criterion(logit, target.long())
-        pt = torch.exp(logpt)
-        if alpha is not None:
-            logpt *= alpha
-        loss = -((1 - pt) ** gamma) * logpt
+        n, c, h, w = logit.size()
+        target_one_hot = torch.zeros(n, c, h, w, device=logit.device)
+        target_one_hot.scatter_(1, target.unsqueeze(1).long(), 1)
 
-        if self.batch_average:
-            loss /= n
+        loss = sigmoid_focal_loss(
+            logit, target_one_hot, alpha, gamma, reduction)
 
         return loss
+
+    # def FocalLoss(self, logit, target, gamma=2, alpha=0.25):
+    #     n, c, h, w = logit.size()
+    #     criterion = nn.CrossEntropyLoss(
+    #         weight=self.weight, ignore_index=self.ignore_index, reduction='mean')
+    #     if self.cuda:
+    #         criterion = criterion.cuda()
+
+    #     logpt = -criterion(logit, target.long())
+    #     pt = torch.exp(logpt)
+    #     if alpha is not None:
+    #         logpt *= alpha
+    #     loss = -((1 - pt) ** gamma) * logpt
+
+    #     if self.batch_average:
+    #         loss /= n
+
+    #     return loss
 
 
 class OhemCELoss(nn.Module):

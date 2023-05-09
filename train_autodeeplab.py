@@ -1,3 +1,7 @@
+import warnings
+from rasterio.errors import NotGeoreferencedWarning
+
+warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
 import os
 import numpy as np
 import torch.nn as nn
