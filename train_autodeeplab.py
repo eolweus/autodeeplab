@@ -5,6 +5,7 @@ warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
 import os
 import numpy as np
 import torch.nn as nn
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 from collections import OrderedDict
 from modeling.backbone.solis_models import autodeeplab50
@@ -35,7 +36,7 @@ random.seed(42)
 #     from apex import amp
 #     APEX_AVAILABLE = True
 # except ModuleNotFoundError:
-APEX_AVAILABLE = False
+#     APEX_AVAILABLE = False
 
 
 print('working with pytorch version {}'.format(torch.__version__))
@@ -56,7 +57,8 @@ class Trainer(object):
         # Define Tensorboard Summary
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        self.use_amp = True if (APEX_AVAILABLE and args.use_amp) else False
+        # self.use_amp = True if (APEX_AVAILABLE and args.use_amp) else False
+        self.use_amp = args.use_amp and args.cuda
         self.opt_level = args.opt_level
 
         kwargs = {'num_workers': args.workers,
@@ -111,12 +113,12 @@ class Trainer(object):
             self.model = self.model.cuda()
 
         # mixed precision
+
         if self.use_amp and args.cuda:
-            keep_batchnorm_fp32 = True if (
-                self.opt_level == 'O2' or self.opt_level == 'O3') else None
+            self.scaler = GradScaler()
 
             # fix for current pytorch version with opt_level 'O1'
-            if self.opt_level == 'O1' and torch.__version__ < '1.3':
+            if torch.__version__ < '1.3':
                 for module in self.model.modules():
                     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
                         # Hack to fix BN fprop without affine transformation
@@ -129,13 +131,36 @@ class Trainer(object):
                                 torch.zeros(module.running_var.shape, dtype=module.running_var.dtype,
                                             device=module.running_var.device), requires_grad=False)
 
-            # print(keep_batchnorm_fp32)
-            self.model, [self.optimizer, self.architect_optimizer] = amp.initialize(
-                self.model, [self.optimizer,
-                             self.architect_optimizer], opt_level=self.opt_level,
-                keep_batchnorm_fp32=keep_batchnorm_fp32, loss_scale="dynamic")
-
             print('cuda finished')
+
+        #### OLD START ####
+        # if self.use_amp and args.cuda:
+        #     keep_batchnorm_fp32 = True if (
+        #         self.opt_level == 'O2' or self.opt_level == 'O3') else None
+
+        #     # fix for current pytorch version with opt_level 'O1'
+        #     if self.opt_level == 'O1' and torch.__version__ < '1.3':
+        #         for module in self.model.modules():
+        #             if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+        #                 # Hack to fix BN fprop without affine transformation
+        #                 if module.weight is None:
+        #                     module.weight = torch.nn.Parameter(
+        #                         torch.ones(module.running_var.shape, dtype=module.running_var.dtype,
+        #                                    device=module.running_var.device), requires_grad=False)
+        #                 if module.bias is None:
+        #                     module.bias = torch.nn.Parameter(
+        #                         torch.zeros(module.running_var.shape, dtype=module.running_var.dtype,
+        #                                     device=module.running_var.device), requires_grad=False)
+
+        #     # print(keep_batchnorm_fp32)
+        #     self.model, [self.optimizer, self.architect_optimizer] = amp.initialize(
+        #         self.model, [self.optimizer,
+        #                      self.architect_optimizer], opt_level=self.opt_level,
+        #         keep_batchnorm_fp32=keep_batchnorm_fp32, loss_scale="dynamic")
+
+        #     print('cuda finished')
+
+        #### OLD END ####
 
         # Using data parallel
         if args.cuda and len(self.args.gpu_ids) > 1:
@@ -211,12 +236,20 @@ class Trainer(object):
             self.optimizer.zero_grad()
             output = self.model(image)
             loss = self.criterion(output, target)
+            # if self.use_amp:
+            #     with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+            #         scaled_loss.backward()
+            # else:
+            #     loss.backward()
+            # self.optimizer.step()
+            with autocast(enabled=self.use_amp):
+                loss = self.criterion(output, target)
             if self.use_amp:
-                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                self.scaler.scale(loss).backward()
             else:
                 loss.backward()
-            self.optimizer.step()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
 
             if epoch >= self.args.alpha_epoch:
                 search = next(iter(self.train_loaderB))
@@ -230,12 +263,20 @@ class Trainer(object):
                 self.architect_optimizer.zero_grad()
                 output_search = self.model(image_search)
                 arch_loss = self.criterion(output_search, target_search)
+                # if self.use_amp:
+                #     with amp.scale_loss(arch_loss, self.architect_optimizer) as arch_scaled_loss:
+                #         arch_scaled_loss.backward()
+                # else:
+                #     arch_loss.backward()
+                # self.architect_optimizer.step()
+                with autocast(enabled=self.use_amp):
+                    arch_loss = self.criterion(output_search, target_search)
                 if self.use_amp:
-                    with amp.scale_loss(arch_loss, self.architect_optimizer) as arch_scaled_loss:
-                        arch_scaled_loss.backward()
+                    self.scaler.scale(arch_loss).backward()
                 else:
                     arch_loss.backward()
-                self.architect_optimizer.step()
+                self.scaler.step(self.architect_optimizer)
+                self.scaler.update()
 
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
