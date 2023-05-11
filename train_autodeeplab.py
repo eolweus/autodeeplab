@@ -204,14 +204,14 @@ class Trainer(object):
                     copy_state_dict(self.model.module.state_dict(),
                                     checkpoint['state_dict'])
                 else:
-                    # self.model.load_state_dict(checkpoint['state_dict'])
-                    copy_state_dict(self.model.state_dict(),
-                                    checkpoint['state_dict'])
+                    self.model.load_state_dict(checkpoint['state_dict'])
+                    # copy_state_dict(self.model.state_dict(),
+                    #                 checkpoint['state_dict'])
 
             if not args.ft:
-                # self.optimizer.load_state_dict(checkpoint['optimizer'])
-                copy_state_dict(self.optimizer.state_dict(),
-                                checkpoint['optimizer'])
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+                # copy_state_dict(self.optimizer.state_dict(),
+                #                 checkpoint['optimizer'])
             self.best_pred = checkpoint['best_pred']
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))

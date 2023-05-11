@@ -65,7 +65,7 @@ class AutoDeeplab(nn.Module):
             self.backbone = None
 
         self.stem0 = nn.Sequential(
-            nn.Conv2d(3, half_f_initial * self._block_multiplier,
+            nn.Conv2d(self.num_bands, half_f_initial * self._block_multiplier,
                       3, stride=2, padding=1),
             nn.BatchNorm2d(half_f_initial * self._block_multiplier),
             nn.ReLU()
