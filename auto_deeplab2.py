@@ -11,7 +11,7 @@ from torchvision.models._utils import IntermediateLayerGetter
 
 
 class AutoDeeplab(nn.Module):
-    def __init__(self, num_classes, num_layers, criterion=None, filter_multiplier=8, block_multiplier=5, step=5, cell=cell_level_search.Cell, num_bands: int = 12, backbone_module: Optional[dict] = None):
+    def __init__(self, num_classes, num_layers, criterion=None, filter_multiplier=8, block_multiplier=5, step=5, cell=cell_level_search.Cell, num_bands: int = 3, backbone_module: Optional[dict] = None):
         super(AutoDeeplab, self).__init__()
 
         self.cells = nn.ModuleList()
@@ -22,6 +22,7 @@ class AutoDeeplab(nn.Module):
         self._filter_multiplier = filter_multiplier
         self._criterion = criterion
         self._initialize_alphas_betas()
+        self.num_bands = num_bands
         f_initial = int(self._filter_multiplier)
         half_f_initial = int(f_initial / 2)
 
@@ -201,20 +202,19 @@ class AutoDeeplab(nn.Module):
 
     def forward(self, x):
         # Check the chatgpt code above "benefits of avocado" for a better way to do this
-        # if self.backbone is not None:
-        #     with torch.no_grad():
-        #         # ResNet backbone returns a dict with keys 'out' and 'aux'
-        #         # 'out' is the output of the last layer of the backbone
-        #         # 'aux' is the output of the layer before the last layer
-        #         # We only need 'out' for the decoder
-        #         temp = self.backbone(x)['out']
-        #         print(temp.shape)
-        #     level_4_curr = self.stem2(temp)
-        # else:
-        temp = self.stem0(x)
-        temp = self.stem1(temp)
-        # print(temp.shape)
-        level_4_curr = self.stem2(temp)
+        if self.backbone is not None:
+            with torch.no_grad():
+                # ResNet backbone returns a dict with keys 'out' and 'aux'
+                # 'out' is the output of the last layer of the backbone
+                # 'aux' is the output of the layer before the last layer
+                # We only need 'out' for the decoder
+                temp = self.backbone(x)['out']
+                print(temp.shape)
+            level_4_curr = self.stem2(temp)
+        else:
+            temp = self.stem0(x)
+            temp = self.stem1(temp)
+            level_4_curr = self.stem2(temp)
         # Solis
 
         count = 0
