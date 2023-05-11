@@ -246,10 +246,11 @@ class Trainer(object):
                 loss = self.criterion(output, target)
             if self.use_amp:
                 self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
             else:
                 loss.backward()
-            self.scaler.step(self.optimizer)
-            self.scaler.update()
+                self.optimizer.step()
 
             if epoch >= self.args.alpha_epoch:
                 search = next(iter(self.train_loaderB))
@@ -273,10 +274,11 @@ class Trainer(object):
                     arch_loss = self.criterion(output_search, target_search)
                 if self.use_amp:
                     self.scaler.scale(arch_loss).backward()
+                    self.scaler.step(self.architect_optimizer)
+                    self.scaler.update()
                 else:
                     arch_loss.backward()
-                self.scaler.step(self.architect_optimizer)
-                self.scaler.update()
+                    self.architect_optimizer.step()
 
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
