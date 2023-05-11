@@ -1,13 +1,16 @@
 import argparse
 
+
 def obtain_decode_args():
-    parser = argparse.ArgumentParser(description="PyTorch DeeplabV3Plus Training")
+    parser = argparse.ArgumentParser(
+        description="PyTorch DeeplabV3Plus Training")
     parser.add_argument('--backbone', type=str, default='resnet',
                         choices=['resnet', 'xception', 'drn', 'mobilenet'],
                         help='backbone name (default: resnet)')
-    parser.add_argument('--dataset', type=str, default='cityscapes',
-                        choices=['pascal', 'coco', 'cityscapes', 'kd'],
-                        help='dataset name (default: pascal)')
+    parser.add_argument('--dataset', type=str, default='solis',
+                        choices=['pascal', 'coco',
+                                 'cityscapes', 'kd', 'solis'],
+                        help='dataset name (default: solis)')
     parser.add_argument('--autodeeplab', type=str, default='train',
                         choices=['search', 'train'])
     parser.add_argument('--load-parallel', type=int, default=0)
@@ -25,8 +28,8 @@ def obtain_decode_args():
     parser.add_argument('--test-batch-size', type=int, default=None,
                         metavar='N', help='input batch size for \
                                 testing (default: auto)')
-    parser.add_argument('--no-cuda', action='store_true', default=
-                        False, help='disables CUDA training')
+    parser.add_argument('--no-cuda', action='store_true',
+                        default=False, help='disables CUDA training')
     parser.add_argument('--resume', type=str, default=None,
                         help='put the path to resuming file if needed')
 

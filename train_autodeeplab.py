@@ -18,9 +18,9 @@ from utils.lr_scheduler import LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
-# from auto_deeplab2 import AutoDeeplab
+from auto_deeplab2 import AutoDeeplab
 # TODO: remember to use this instead of the auto_deeplab2
-from auto_deeplab import AutoDeeplab
+# from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
 
@@ -349,8 +349,8 @@ class Trainer(object):
         print('Validation:')
         print('[Epoch: %d, numImages: %5d]' %
               (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(
-            Acc, Acc_class, mIoU, FWIoU))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, F1: {}".format(
+            Acc, Acc_class, mIoU, FWIoU, F1))
         print('Loss: %.3f' % test_loss)
         new_pred = mIoU
         if new_pred > self.best_pred:

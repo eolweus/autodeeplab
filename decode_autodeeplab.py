@@ -10,11 +10,15 @@ class Loader(object):
         self.args = args
         if self.args.dataset == 'cityscapes':
             self.nclass = 19
+        if self.args.dataset == 'solis':
+            self.nclass = 2
 
         # Resuming checkpoint
         self.best_pred = 0.0
-        assert args.resume is not None, RuntimeError("No model to decode in resume path: '{:}'".format(args.resume))
-        assert os.path.isfile(args.resume), RuntimeError("=> no checkpoint found at '{}'".format(args.resume))
+        assert args.resume is not None, RuntimeError(
+            "No model to decode in resume path: '{:}'".format(args.resume))
+        assert os.path.isfile(args.resume), RuntimeError(
+            "=> no checkpoint found at '{}'".format(args.resume))
 
         checkpoint = torch.load(args.resume)
         args.start_epoch = checkpoint['epoch']
