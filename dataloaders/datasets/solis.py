@@ -86,19 +86,8 @@ class ChipFolderSegmentationDataset(Dataset):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", NotGeoreferencedWarning)
 
-        # if self.args.num_bands == 3 only use band 4, 3 and 2 as red, green blue
-        if self.args.num_bands == 3:
-            with rasterio.open(self.chips[key][0]) as dataset:
-                data = torch.tensor(
-                    dataset.read([4, 3, 2]).astype(np.float32))
-        elif self.args.num_bands == 12:
-            # else use specified number of bands
-            with rasterio.open(self.chips[key][0]) as dataset:
-                data = torch.tensor(dataset.read().astype(np.float32))
-        else:
-            with rasterio.open(self.chips[key][0]) as dataset:
-                data = torch.tensor(
-                    dataset.read(list(range(1, self.args.num_bands + 1))).astype(np.float32))
+        with rasterio.open(self.chips[key][0]) as dataset:
+            data = torch.tensor(dataset.read().astype(np.float32))
 
         if self.chips[key][1]:
             with rasterio.open(self.chips[key][1]) as dataset:
@@ -111,6 +100,10 @@ class ChipFolderSegmentationDataset(Dataset):
 
         if self.transform:
             data, target = self.transform(data, target)
+
+        # if self.args.num_bands == 3 only use band 4, 3 and 2 as red, green blue
+        if self.args.num_bands == 3:
+            data = data[[4, 3, 2], :, :]
 
         return data, target
 
