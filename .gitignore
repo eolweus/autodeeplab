@@ -9,5 +9,9 @@ venv/
 pre_trainedResnet50.pt
 run/
 image_samples/
+mypath.py
 
 nohup.out
+gpu_usage.log
+test-srun.out
+

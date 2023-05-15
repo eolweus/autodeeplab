@@ -11,7 +11,7 @@ class Saver(object):
     def __init__(self, args, use_dist=False):
         self.args = args
         self.use_dist = use_dist
-        self.directory = os.path.join('run', args.dataset, args.checkname)
+        self.directory = os.path.join('../run', args.dataset, args.checkname)
         self.runs = sorted(
             glob.glob(os.path.join(self.directory, 'experiment_*')))
         run_id = max([int(x.split('_')[-1])
