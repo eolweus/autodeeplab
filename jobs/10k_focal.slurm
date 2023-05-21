@@ -6,8 +6,8 @@
 #SBATCH --gres=gpu:A100m80:1
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=18000
-#SBATCH --job-name="10k"
-#SBATCH --output="/cluster/home/erlingfo/autodeeplab/out/10k.out"
+#SBATCH --job-name="10k_focal"
+#SBATCH --output="/cluster/home/erlingfo/autodeeplab/out/10k_focal.out"
 #SBATCH --mail-user=erlingfo@stud.ntnu.no
 #SBATCH --mail-type=ALL
 
@@ -33,19 +33,20 @@ else
 fi
 
 # Clear and create the gpu_usage.log file
-#truncate -s 0 /cluster/home/erlingfo/autodeeplab/out/10k_gpu_usage.log
-#truncate -s 0 /cluster/home/erlingfo/autodeeplab/out/10k_cpu_usage.log
+truncate -s 0 /cluster/home/erlingfo/autodeeplab/out/10k_focal_gpu_usage.log
+truncate -s 0 /cluster/home/erlingfo/autodeeplab/out/10k_focal_cpu_usage.log
 
 # Monitor GPU usage and log to a file
 while true; do
-    nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv >> /cluster/home/erlingfo/autodeeplab/out/gpu_usage.log
+    nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv \
+        >> /cluster/home/erlingfo/autodeeplab/out/10k_focal_gpu_usage.log
     sleep 10
 done &
 GPU_MONITOR_PID=$!
 
 # Monitor CPU usage and log to a file
 while true; do
-    top -b -n 1 | grep 'Cpu(s)' >> /cluster/home/erlingfo/autodeeplab/out/10k_cpu_usage.log
+    top -b -n 1 | grep 'Cpu(s)' >> /cluster/home/erlingfo/autodeeplab/out/10k_focal_cpu_usage.log
     sleep 10
 done &
 CPU_MONITOR_PID=$!
@@ -59,10 +60,10 @@ conda activate autodl
 
 export PYTHONBUFFERED=1
 CUDA_VISIBLE_DEVICES=0 python /cluster/home/erlingfo/autodeeplab/train_autodeeplab.py \
- --batch-size $BATCH_SIZE --dataset solis --checkname "no_bb_10010" \
+ --batch-size $BATCH_SIZE --dataset solis --checkname "no_bb_10010_focal" \
  --alpha_epoch 20 --filter_multiplier 8 --resize 224 --crop_size 224 \
- --num_bands 12 --epochs 40 --num_images 10010 --loss-type ce \
- --resume /cluster/home/erlingfo/autodeeplab/run/solis/no_bb_10010/experiment_2/checkpoint.pth.tar
+ --num_bands 12 --epochs 40 --num_images 10010 --loss-type focal \
+ --resume /cluster/home/erlingfo/autodeeplab/run/solis/no_bb_10010/experiment_0/checkpoint.pth.tar
 
 # Stop the background GPU monitor process
 kill $GPU_MONITOR_PID

@@ -1,14 +1,14 @@
 #!/bin/sh
 #SBATCH --partition=GPUQ
 #SBATCH --account=share-ie-idi
-#SBATCH --time=24:00:00
+#SBATCH --time=00:10:00
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --constraint="P100|A100"
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=15000
 #SBATCH --job-name="decode-model"
-#SBATCH --output=~/autodeeplab/out/decode.out
+#SBATCH --output=/cluster/home/erlingfo/autodeeplab/out/decode.out
 #SBATCH --mail-user=erlingfo@stud.ntnu.no
 #SBATCH --mail-type=ALL
 
@@ -36,6 +36,6 @@ conda activate autodl
 checkpoint=$1
 
 export PYTHONBUFFERED=1
-python decode_autodeeplab.py --resume "$checkpoint"
+python /cluster/home/erlingfo/autodeeplab/decode_autodeeplab.py --resume "$checkpoint"
 uname -a 
 
