@@ -43,6 +43,8 @@ class ChipFolderSegmentationDataset(Dataset):
         self.args = args
 
         num_images = args.num_images or None
+        if args.use_ab:
+            num_images = num_images + num_images * 0.8
         subset_ratio = args.subset_ratio or None
 
         positive_chips = []
@@ -108,7 +110,6 @@ class ChipFolderSegmentationDataset(Dataset):
             # green = data[2:3, :, :]
             # blue = data[1:2, :, :]
             # data = torch.cat((red, green, blue), 0)
-
 
         return data, target
 

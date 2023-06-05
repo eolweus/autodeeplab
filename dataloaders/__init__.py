@@ -96,14 +96,19 @@ def make_data_loader(args, **kwargs):
             elif args.autodeeplab == 'train':
                 return train_loader, num_class
 
-
         elif args.dataset == 'solis':
             dataset = solis_data_module.ChipFolderSegmentationDatamodule(args)
-            train_loader = dataset.train_dataloader()
+            if args.use_ab and args.autodeeplab == 'search':
+                train_loader1, train_loader2 = dataset.train_dataloader_ab()
+            else:
+                train_loader1 = dataset.train_dataloader()
+                train_loader2 = train_loader1
             val_loader = dataset.val_dataloader()
             num_class = 2
             test_loader = None
-            return train_loader, train_loader, val_loader, test_loader, num_class
+            if args.autodeeplab == 'train':
+                return train_loader1, num_class
+            return train_loader1, train_loader2, val_loader, test_loader, num_class
 
         else:
             raise NotImplementedError

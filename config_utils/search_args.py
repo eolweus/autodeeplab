@@ -25,6 +25,8 @@ def obtain_search_args():
                         help='dataset name (default: pascal)')
     parser.add_argument('--autodeeplab', type=str, default='search',
                         choices=['search', 'train'])
+    parser.add_argument('--use_ab', type=bool, default=False,
+                        help='split training data into A and B')
     parser.add_argument('--use-sbd', action='store_true', default=False,
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--load-parallel', type=int, default=0)

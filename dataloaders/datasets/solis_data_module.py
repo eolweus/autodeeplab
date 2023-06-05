@@ -69,6 +69,7 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
         super().__init__()
         self.batch_size = args.batch_size
         self.num_workers = args.workers
+        self.use_ab = args.use_ab
 
         transform = SolisCompose([
             SolisNormalize(mean, std),
@@ -79,23 +80,57 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
         self.dataset = ChipFolderSegmentationDataset(
             args, root, transform=transform)
 
-        train_dataset_size = int(0.8 * len(self.dataset))
+        if args.autodeeplab == 'search' and args.use_ab:
+            train_dataset_size = int(len(self.dataset) * 2 / 2.25)
+        else:
+            train_dataset_size = int(0.8 * len(self.dataset))
+
         val_dataset_size = len(self.dataset) - train_dataset_size
 
         self.train_dataset, self.val_dataset = torch.utils.data.random_split(
             self.dataset,
             [train_dataset_size, val_dataset_size])
 
-        print("Found %d %s images" % (train_dataset_size, "training"))
+        if args.autodeeplab == 'search' and args.use_ab:
+            self.train_dataset_a, self.train_dataset_b = torch.utils.data.random_split(
+                self.train_dataset,
+                [int(train_dataset_size / 2), int(train_dataset_size / 2)])
+
+            print("Found %d %s images" %
+                  (train_dataset_size / 2, "training (a and b)"))
+        else:
+            self.train_dataset_a = self.train_dataset
+            self.train_dataset_b = self.train_dataset
+
+            print("Found %d %s images" % (train_dataset_size, "training"))
         print("Found %d %s images" % (val_dataset_size, "validation"))
 
     def train_dataloader(self):
+        if self.use_ab:
+            print("WARNING, use_ab is true")
         return torch.utils.data.DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             shuffle=True,
             pin_memory=True)
+
+    def train_dataloader_ab(self):
+        if not self.use_ab:
+            print("WARNING, use_ab is false")
+        return [torch.utils.data.DataLoader(
+            self.train_dataset_a,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            pin_memory=True),
+            torch.utils.data.DataLoader(
+            self.train_dataset_b,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            shuffle=True,
+            pin_memory=True)
+        ]
 
     def val_dataloader(self):
         return torch.utils.data.DataLoader(
