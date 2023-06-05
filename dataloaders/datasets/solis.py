@@ -101,9 +101,14 @@ class ChipFolderSegmentationDataset(Dataset):
         if self.transform:
             data, target = self.transform(data, target)
 
-        # if self.args.num_bands == 3 only use band 4, 3 and 2 as red, green blue
+        # if self.args.num_bands == 3 only use band 3, 2 and 1 as red, green blue
         if self.args.num_bands == 3:
-            data = data[[4, 3, 2], :, :]
+            data = data[[3, 2, 1], :, :]
+            # red = data[3:4, :, :]
+            # green = data[2:3, :, :]
+            # blue = data[1:2, :, :]
+            # data = torch.cat((red, green, blue), 0)
+
 
         return data, target
 

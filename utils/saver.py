@@ -26,6 +26,7 @@ class Saver(object):
         """Saves checkpoint to disk"""
         filename = os.path.join(self.experiment_dir, filename)
         if (self.use_dist and dist.get_rank() == 0) or not self.use_dist:
+            print("saving checkpoint:", filename)
             torch.save(state, filename)
             if is_best:
                 best_pred = state['best_pred']

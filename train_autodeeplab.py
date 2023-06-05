@@ -184,6 +184,7 @@ class Trainer(object):
             if not os.path.isfile(args.resume):
                 raise RuntimeError(
                     "=> no checkpoint found at '{}'" .format(args.resume))
+            print('loading checkpoint')
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
 
@@ -303,7 +304,6 @@ class Trainer(object):
                 state_dict = self.model.module.state_dict()
             else:
                 state_dict = self.model.state_dict()
-            # TODO: mulig å få bare state_dict for autodl?
             self.saver.save_checkpoint({
                 'epoch': epoch + 1,
                 'state_dict': state_dict,
@@ -358,16 +358,19 @@ class Trainer(object):
         if new_pred > self.best_pred:
             is_best = True
             self.best_pred = new_pred
-            if torch.cuda.device_count() > 1:
-                state_dict = self.model.module.state_dict()
-            else:
-                state_dict = self.model.state_dict()
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': state_dict,
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best)
+        else:
+            is_best = False
+        # save checkpoint every epoch
+        if torch.cuda.device_count() > 1:
+            state_dict = self.model.module.state_dict()
+        else:
+            state_dict = self.model.state_dict()
+        self.saver.save_checkpoint({
+            'epoch': epoch + 1,
+            'state_dict': state_dict,
+            'optimizer': self.optimizer.state_dict(),
+            'best_pred': self.best_pred,
+        }, is_best)
 
 
 def main():
