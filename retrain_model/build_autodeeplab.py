@@ -19,7 +19,8 @@ class Retrain_Autodeeplab(nn.Module):
             net_arch, cell_arch = np.load(args.net_arch), np.load(args.cell_arch)
         else:
             network_arch, cell_arch, network_path = get_default_arch()
-        self.encoder = newModel(network_arch, cell_arch, args.num_classes, 12, args.filter_multiplier, BatchNorm=BatchNorm2d, args=args)
+        self.encoder = newModel(network_arch, cell_arch, args.num_classes,
+                                12, args.filter_multiplier, BatchNorm=BatchNorm2d, args=args)
         self.aspp = ASPP(args.filter_multiplier * args.block_multiplier * filter_param_dict[network_path[-1]],
                          256, args.num_classes, conv=nn.Conv2d, norm=BatchNorm2d)
         self.decoder = Decoder(args.num_classes, filter_multiplier=args.filter_multiplier * args.block_multiplier,
@@ -34,7 +35,7 @@ class Retrain_Autodeeplab(nn.Module):
     def get_params(self):
         back_bn_params, back_no_bn_params = self.encoder.get_params()
         tune_wd_params = list(self.aspp.parameters()) \
-                         + list(self.decoder.parameters()) \
-                         + back_no_bn_params
+            + list(self.decoder.parameters()) \
+            + back_no_bn_params
         no_tune_wd_params = back_bn_params
         return tune_wd_params, no_tune_wd_params

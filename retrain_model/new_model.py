@@ -24,8 +24,10 @@ class Cell(nn.Module):
         self.C_prev = int(block_multiplier * prev_filter_multiplier)
         self.C_prev_prev = int(block_multiplier * prev_prev_fmultiplier)
         self.downup_sample = downup_sample
-        self.pre_preprocess = ReLUConvBN(self.C_prev_prev, self.C_out, 1, 1, 0, args.affine, args.use_ABN)
-        self.preprocess = ReLUConvBN(self.C_prev, self.C_out, 1, 1, 0, args.affine, args.use_ABN)
+        self.pre_preprocess = ReLUConvBN(
+            self.C_prev_prev, self.C_out, 1, 1, 0, args.affine, args.use_ABN)
+        self.preprocess = ReLUConvBN(
+            self.C_prev, self.C_out, 1, 1, 0, args.affine, args.use_ABN)
         self._steps = steps
         self.block_multiplier = block_multiplier
         self._ops = nn.ModuleList()
@@ -35,11 +37,19 @@ class Cell(nn.Module):
             self.scale = 2
         for x in self.cell_arch:
             primitive = PRIMITIVES[x[1]]
-            op = OPS[primitive](self.C_out, stride=1, affine=args.affine, use_ABN=args.use_ABN)
+            op = OPS[primitive](self.C_out, stride=1,
+                                affine=args.affine, use_ABN=args.use_ABN)
             self._ops.append(op)
 
+    # def scale_dimension(self, dim, scale):
+    #     return (int((float(dim) - 1.0) * scale + 1.0) if dim % 2 == 1 else int((float(dim) * scale)))
+
     def scale_dimension(self, dim, scale):
-        return (int((float(dim) - 1.0) * scale + 1.0) if dim % 2 == 1 else int((float(dim) * scale)))
+        assert isinstance(dim, int)
+        if scale < 1 and dim % 2:  # Special case if odd number and downscaling.
+            return int(math.floor((float(dim) - 1.0) * scale + 1.0))
+        else:
+            return int(dim * scale)
 
     def forward(self, prev_prev_input, prev_input):
         s0 = prev_prev_input
@@ -47,10 +57,11 @@ class Cell(nn.Module):
         if self.downup_sample != 0:
             feature_size_h = self.scale_dimension(s1.shape[2], self.scale)
             feature_size_w = self.scale_dimension(s1.shape[3], self.scale)
-            s1 = F.interpolate(s1, [feature_size_h, feature_size_w], mode='bilinear', align_corners=True)
+            s1 = F.interpolate(
+                s1, [feature_size_h, feature_size_w], mode='bilinear', align_corners=True)
         if (s0.shape[2] != s1.shape[2]) or (s0.shape[3] != s1.shape[3]):
             s0 = F.interpolate(s0, (s1.shape[2], s1.shape[3]),
-                                            mode='bilinear', align_corners=True)
+                               mode='bilinear', align_corners=True)
 
         s0 = self.pre_preprocess(s0) if (s0.shape[1] != self.C_out) else s0
         s1 = self.preprocess(s1)
@@ -119,7 +130,8 @@ class newModel(nn.Module):
             prev_level = torch.argmax(prev_level_option).item()
             prev_prev_level = torch.argmax(prev_prev_level_option).item()
             if i == 0:
-                downup_sample = - torch.argmax(torch.sum(self.network_arch[0], dim=1))
+                downup_sample = - \
+                    torch.argmax(torch.sum(self.network_arch[0], dim=1))
                 _cell = cell(self._step, self._block_multiplier, ini_initial_fm / args.block_multiplier,
                              initial_fm / args.block_multiplier,
                              self.cell_arch, self.network_arch[i],
@@ -132,14 +144,16 @@ class newModel(nn.Module):
                 if i == 1:
                     _cell = cell(self._step, self._block_multiplier,
                                  initial_fm / args.block_multiplier,
-                                 self._filter_multiplier * filter_param_dict[prev_level],
+                                 self._filter_multiplier *
+                                 filter_param_dict[prev_level],
                                  self.cell_arch, self.network_arch[i],
                                  self._filter_multiplier *
                                  filter_param_dict[level],
                                  downup_sample, self.args)
                 else:
                     _cell = cell(self._step, self._block_multiplier,
-                                 self._filter_multiplier * filter_param_dict[prev_prev_level],
+                                 self._filter_multiplier *
+                                 filter_param_dict[prev_prev_level],
                                  self._filter_multiplier *
                                  filter_param_dict[prev_level],
                                  self.cell_arch, self.network_arch[i],
@@ -154,7 +168,8 @@ class newModel(nn.Module):
         stem1 = self.stem2(stem0)
         two_last_inputs = (stem0, stem1)
         for i in range(self._num_layers):
-            two_last_inputs = self.cells[i](two_last_inputs[0], two_last_inputs[1])
+            two_last_inputs = self.cells[i](
+                two_last_inputs[0], two_last_inputs[1])
             if i == 2:
                 low_level_feature = two_last_inputs[1]
         last_output = two_last_inputs[-1]
