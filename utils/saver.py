@@ -54,24 +54,43 @@ class Saver(object):
 
     def save_experiment_config(self):
         if (self.use_dist and dist.get_rank() == 0) or not self.use_dist:
-            logfile = os.path.join(self.experiment_dir, 'parameters.txt')
-            log_file = open(logfile, 'w')
-            p = OrderedDict()
-            p['datset'] = self.args.dataset
-            p['backbone'] = self.args.backbone
-            p['out_stride'] = self.args.out_stride
-            p['lr'] = self.args.lr
-            p['lr_scheduler'] = self.args.lr_scheduler
-            p['loss_type'] = self.args.loss_type
-            p['epochs'] = self.args.epochs
-            p['alpha_epoch'] = self.args.alpha_epoch
-            p['batch_size'] = self.args.batch_size
-            p['workers'] = self.args.workers
-            p['resize'] = self.args.resize
-            p['crop_size'] = self.args.crop_size
-            p['num_images'] = self.args.num_images
-            p['subset_ratio'] = self.args.subset_ratio
-            p['num_bands'] = self.args.num_bands
-            for key, val in p.items():
-                log_file.write(key + ':' + str(val) + '\n')
-            log_file.close()
+            if self.args.autodeeplab == 'search':
+                logfile = os.path.join(self.experiment_dir, 'parameters.txt')
+                log_file = open(logfile, 'w')
+                p = OrderedDict()
+                p['datset'] = self.args.dataset
+                p['backbone'] = self.args.backbone
+                p['out_stride'] = self.args.out_stride
+                p['lr'] = self.args.lr
+                p['lr_scheduler'] = self.args.lr_scheduler
+                p['loss_type'] = self.args.loss_type
+                p['epochs'] = self.args.epochs
+                p['alpha_epoch'] = self.args.alpha_epoch
+                p['batch_size'] = self.args.batch_size
+                p['workers'] = self.args.workers
+                p['resize'] = self.args.resize
+                p['crop_size'] = self.args.crop_size
+                p['num_images'] = self.args.num_images
+                p['subset_ratio'] = self.args.subset_ratio
+                p['num_bands'] = self.args.num_bands
+                for key, val in p.items():
+                    log_file.write(key + ':' + str(val) + '\n')
+                log_file.close()
+            else:
+                logfile = os.path.join(self.experiment_dir, 'parameters.txt')
+                log_file = open(logfile, 'w')
+                p = OrderedDict()
+                p['datset'] = self.args.dataset
+                p['backbone'] = self.args.backbone
+                p['base_lr'] = self.args.base_lr
+                p['epochs'] = self.args.epochs
+                p['batch_size'] = self.args.batch_size
+                p['workers'] = self.args.workers
+                p['resize'] = self.args.resize
+                p['crop_size'] = self.args.crop_size
+                p['num_images'] = self.args.num_images
+                p['subset_ratio'] = self.args.subset_ratio
+                p['num_bands'] = self.args.num_bands
+                for key, val in p.items():
+                    log_file.write(key + ':' + str(val) + '\n')
+                log_file.close()
