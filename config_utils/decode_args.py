@@ -15,14 +15,14 @@ def obtain_decode_args():
                         choices=['search', 'train'])
     parser.add_argument('--load-parallel', type=int, default=0)
     parser.add_argument('--clean-module', type=int, default=0)
-    parser.add_argument('--crop_size', type=int, default=320,
+    parser.add_argument('--crop_size', type=int, default=224,
                         help='crop image size')
-    parser.add_argument('--resize', type=int, default=512,
+    parser.add_argument('--resize', type=int, default=224,
                         help='resize image size')
     parser.add_argument('--filter_multiplier', type=int, default=8)
     parser.add_argument('--block_multiplier', type=int, default=5)
     parser.add_argument('--step', type=int, default=5)
-    parser.add_argument('--batch-size', type=int, default=2,
+    parser.add_argument('--batch-size', type=int, default=22,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
