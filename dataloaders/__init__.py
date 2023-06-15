@@ -107,7 +107,7 @@ def make_data_loader(args, **kwargs):
             num_class = 2
             test_loader = None
             if args.autodeeplab == 'train':
-                return train_loader1, num_class
+                return train_loader1, val_loader
             return train_loader1, train_loader2, val_loader, test_loader, num_class
 
         else:

@@ -69,7 +69,7 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
         super().__init__()
         self.batch_size = args.batch_size
         self.num_workers = args.workers
-        self.use_ab = args.use_ab
+        self.use_ab = args.use_ab if args.use_ab else False
 
         transform = SolisCompose([
             SolisNormalize(mean, std),
@@ -80,7 +80,7 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
         self.dataset = ChipFolderSegmentationDataset(
             args, root, transform=transform)
 
-        if args.autodeeplab == 'search' and args.use_ab:
+        if args.autodeeplab == 'search' and args.use_ab and args.num_images:
             train_dataset_size = int(len(self.dataset) * 2 / 2.25)
         else:
             train_dataset_size = int(0.8 * len(self.dataset))

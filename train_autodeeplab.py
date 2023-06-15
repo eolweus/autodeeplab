@@ -24,11 +24,6 @@ from auto_deeplab2 import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
 
-import random
-
-random.seed(42)
-
-
 # TODO: appears that this is deprecated. Use torch.cuda.amp instead
 # https://pytorch.org/docs/stable/amp.html
 # import apex
@@ -37,6 +32,8 @@ random.seed(42)
 #     APEX_AVAILABLE = True
 # except ModuleNotFoundError:
 #     APEX_AVAILABLE = False
+
+import random
 
 
 print('working with pytorch version {}'.format(torch.__version__))
@@ -256,7 +253,7 @@ class Trainer(object):
             if epoch >= self.args.alpha_epoch:
                 search = next(iter(self.train_loaderB))
                 if self.args.dataset == 'solis':
-                    image_search, target_search = sample
+                    image_search, target_search = search
                 else:
                     image_search, target_search = search['image'], search['label']
                 if self.args.cuda:
@@ -412,6 +409,7 @@ def main():
         args.checkname = 'deeplab-' + str(args.backbone)
     print(args)
     torch.manual_seed(args.seed)
+    random.seed(args.seed)
     trainer = Trainer(args)
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)

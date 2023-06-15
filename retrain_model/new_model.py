@@ -104,10 +104,11 @@ class newModel(nn.Module):
         self._block_multiplier = args.block_multiplier
         self._filter_multiplier = args.filter_multiplier
         self.use_ABN = args.use_ABN
+        self.num_bands = args.num_bands
         initial_fm = 128 if args.initial_fm is None else args.initial_fm
         half_initial_fm = initial_fm // 2
         self.stem0 = nn.Sequential(
-            nn.Conv2d(3, half_initial_fm, 3, stride=2, padding=1),
+            nn.Conv2d(self.num_bands, half_initial_fm, 3, stride=2, padding=1),
             BatchNorm(half_initial_fm)
         )
         self.stem1 = nn.Sequential(

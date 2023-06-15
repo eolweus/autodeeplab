@@ -12,9 +12,6 @@ import warnings
 from rasterio.errors import NotGeoreferencedWarning
 
 
-random.seed(42)
-
-
 class ChipFolderClassificationDataset(DatasetFolder):
     def __init__(self, root: str, transform=None, target_transform=None):
         super().__init__(
@@ -43,8 +40,8 @@ class ChipFolderSegmentationDataset(Dataset):
         self.args = args
 
         num_images = args.num_images or None
-        if args.use_ab:
-            num_images = num_images + num_images * 0.8
+        if args.use_ab and num_images:
+                num_images = int(num_images + num_images * 0.8)
         subset_ratio = args.subset_ratio or None
 
         positive_chips = []
