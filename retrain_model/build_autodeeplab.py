@@ -16,8 +16,8 @@ class Retrain_Autodeeplab(nn.Module):
         if (not args.dist and args.use_ABN) or (args.dist and args.use_ABN and dist.get_rank() == 0):
             print("=> use ABN!")
         if args.net_arch is not None and args.cell_arch is not None:
-            network_path, cell_arch = np.load(
-                args.net_arch), np.load(args.cell_arch)
+            network_path = np.load(args.net_arch)
+            cell_arch = np.load(args.cell_arch)
             network_arch = network_layer_to_space(network_path)
         else:
             network_arch, cell_arch, network_path = get_default_arch()
@@ -25,8 +25,13 @@ class Retrain_Autodeeplab(nn.Module):
                                 12, args.filter_multiplier, BatchNorm=BatchNorm2d, args=args)
         self.aspp = ASPP(args.filter_multiplier * args.block_multiplier * filter_param_dict[network_path[-1]],
                          256, args.num_classes, conv=nn.Conv2d, norm=BatchNorm2d)
-        self.decoder = Decoder(args.num_classes, filter_multiplier=args.filter_multiplier * args.block_multiplier,
-                               args=args, last_level=network_path[-1])
+        # self.decoder = Decoder(args.num_classes, filter_multiplier=args.filter_multiplier * args.block_multiplier,
+        #                        args=args, last_level=network_path[-1])
+
+        # we use a filtermultiplier of 128 for the decoder, because we wish to use an input that is downscaled by 4
+        # The only way to guarantee this is to use a filtermultiplier of 128 and take the output of the stem as the input
+        self.decoder = Decoder(
+            args.num_classes, filter_multiplier=128, args=args, last_level=network_path[-1])
 
     def forward(self, x):
         encoder_output, low_level_feature = self.encoder(x)

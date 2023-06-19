@@ -163,16 +163,18 @@ class newModel(nn.Module):
 
             self.cells += [_cell]
 
+    # Instead of using C2 as low level feature, we use the output of the stem as low level feature
     def forward(self, x):
         stem = self.stem0(x)
         stem0 = self.stem1(stem)
         stem1 = self.stem2(stem0)
         two_last_inputs = (stem0, stem1)
+        low_level_feature = stem1
         for i in range(self._num_layers):
             two_last_inputs = self.cells[i](
                 two_last_inputs[0], two_last_inputs[1])
-            if i == 2:
-                low_level_feature = two_last_inputs[1]
+            # if i == 2:
+            #     low_level_feature = two_last_inputs[1]
         last_output = two_last_inputs[-1]
         # else:
         return last_output, low_level_feature

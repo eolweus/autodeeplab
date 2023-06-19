@@ -109,7 +109,7 @@ class SegmentationLosses(object):
 
 
 class OhemCELoss(nn.Module):
-    def __init__(self, thresh, n_min, ignore_index=255, cuda=False, *args, **kwargs):
+    def __init__(self, thresh, n_min, ignore_index=255, cuda=True, *args, **kwargs):
         super(OhemCELoss, self).__init__()
         self.thresh = thresh
         self.n_min = n_min
@@ -121,20 +121,21 @@ class OhemCELoss(nn.Module):
     def forward(self, logits, labels):
         N, C, H, W = logits.size()
         n_pixs = N * H * W
+        logits = logits.clone()
         logits = logits.permute(0, 2, 3, 1).contiguous().view(-1, C)
         labels = labels.view(-1)
         with torch.no_grad():
             scores = F.softmax(logits, dim=1)
-            labels_cpu = labels
+            labels_cpu = labels.clone()
             invalid_mask = labels_cpu == self.ignore_lb
             labels_cpu[invalid_mask] = 0
-            picks = scores[torch.arange(n_pixs), labels_cpu]
+            picks = scores[torch.arange(n_pixs), labels_cpu.long()]
             picks[invalid_mask] = 1
             sorteds, _ = torch.sort(picks)
             thresh = self.thresh if sorteds[self.n_min] < self.thresh else sorteds[self.n_min]
             labels[picks > thresh] = self.ignore_lb
-        labels = labels.clone()
-        loss = self.criteria(logits, labels)
+        # labels = labels.clone()
+        loss = self.criteria(logits, labels.long())
         return loss
 
 
@@ -142,8 +143,8 @@ def build_criterion(args):
     print("=> Trying bulid {:}loss".format(args.criterion))
     if args.criterion == 'Ohem':
         return OhemCELoss(thresh=args.thresh, n_min=args.n_min, cuda=True)
-    elif args.criterion == 'crossentropy':
-        return SegmentationLosses(weight=args.weight, cuda=True).build_loss(args.mode)
+    elif args.criterion == 'ce':
+        return SegmentationLosses(weight=None, cuda=True).build_loss('ce')
     else:
         raise ValueError('unknown criterion : {:}'.format(args.criterion))
 

@@ -59,7 +59,7 @@ def obtain_retrain_autodeeplab_args():
     parser.add_argument('--max-iteration', default=1000000, type=bool)
     parser.add_argument('--net_arch', default=None, type=str)
     parser.add_argument('--cell_arch', default=None, type=str)
-    parser.add_argument('--criterion', default='Ohem', type=str)
+    parser.add_argument('--criterion', default='ce', type=str)
     parser.add_argument('--initial-fm', default=None, type=int)
     parser.add_argument('--mode', default='poly',
                         type=str, help='how lr decline')

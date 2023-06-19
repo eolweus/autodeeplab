@@ -132,7 +132,11 @@ def main():
             optimizer.step()
             optimizer.zero_grad()
 
-            evaluator.add_batch(target, outputs)
+            # outputs = outputs.data.cpu().numpy()
+            # target = target.cpu().numpy()
+            # outputs = np.argmax(outputs, axis=1)
+            evaluator.add_batch(target.cpu().numpy(), np.argmax(
+                outputs.data.cpu().numpy(), axis=1))
 
             tbar.set_description('Train loss: %.3f' % (losses.sum / (i + 1)))
 
@@ -163,7 +167,12 @@ def main():
                     val_loss = criterion(outputs, target)
                     val_losses.update(val_loss.item(), args.batch_size)
 
-                    evaluator.add_batch(target, outputs)
+                    # outputs = outputs.data.cpu().numpy()
+                    # target = target.cpu().numpy()
+                    # outputs = np.argmax(outputs, axis=1)
+                    # evaluator.add_batch(target, outputs)
+                    evaluator.add_batch(target.cpu().numpy(), np.argmax(
+                        outputs.data.cpu().numpy(), axis=1))
 
             print('Validation: epoch: {0}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
                 epoch + 1, loss=val_losses))
