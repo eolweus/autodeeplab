@@ -1,5 +1,6 @@
 import os
 import pdb
+import random
 import warnings
 import numpy as np
 
@@ -10,6 +11,8 @@ import torch.backends.cudnn
 import torch.optim as optim
 from tqdm import tqdm
 
+from modeling.backbone.solis_models import deeplabv3_resnet50
+
 import dataloaders
 from utils.metrics import Evaluator
 from utils.utils import AverageMeter
@@ -19,6 +22,8 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from retrain_model.build_autodeeplab import Retrain_Autodeeplab
 from config_utils.re_train_autodeeplab import obtain_retrain_autodeeplab_args
+
+import tracemalloc
 
 
 def main():
@@ -47,6 +52,9 @@ def main():
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+
     saver = Saver(args)
     saver.save_experiment_config()
     # Define Tensorboard Summary
@@ -57,6 +65,8 @@ def main():
     # get model
     if args.backbone == 'autodeeplab':
         model = Retrain_Autodeeplab(args)
+    elif args.backbone == 'solis':
+        model = deeplabv3_resnet50()
     else:
         raise ValueError('Unknown backbone: {}'.format(args.backbone))
 
@@ -107,98 +117,127 @@ def main():
 
     print('Starting Epoch:', start_epoch)
 
-    for epoch in range(start_epoch, args.epochs):
-        losses = AverageMeter()
-        model.train()
-        evaluator.reset()
-        tbar = tqdm(dataset_loader)
-        num_img_tr = len(dataset_loader)
-        for i, sample in enumerate(tbar):
-            cur_iter = epoch * len(tbar) + i
-            scheduler(optimizer, cur_iter)
-            if args.dataset == 'solis':
-                inputs, target = sample
-            else:
-                inputs, target = sample['image'], sample['label']
-            if args.cuda:
-                inputs, target = inputs.cuda(), target.cuda()
-            outputs = model(inputs)
-            loss = criterion(outputs, target)
-            if np.isnan(loss.item()) or np.isinf(loss.item()):
-                pdb.set_trace()
-            losses.update(loss.item(), args.batch_size)
-
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-
-            # outputs = outputs.data.cpu().numpy()
-            # target = target.cpu().numpy()
-            # outputs = np.argmax(outputs, axis=1)
-            evaluator.add_batch(target.cpu().numpy(), np.argmax(
-                outputs.data.cpu().numpy(), axis=1))
-
-            tbar.set_description('Train loss: %.3f' % (losses.sum / (i + 1)))
-
-            if i % (num_img_tr // 10) == 0:
-                global_step = i + num_img_tr * epoch
-                summary.visualize_image(
-                    writer, args.dataset, inputs, target, outputs, global_step)
-
-        print('epoch: {0}\t''iter: {1}/{2}\t''lr: {3:.6f}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
-            epoch + 1, i + 1, len(dataset_loader), scheduler.get_lr(optimizer), loss=losses))
-
-        train_mIou = write_epoch(writer, epoch, losses.avg, 'train')
-
-        # Validate after every 5 epochs
-        if epoch % 5 == 0:
-            val_losses = AverageMeter()
-            model.eval()  # set model to evaluation mode
+    try:
+        for epoch in range(start_epoch, args.epochs):
+            losses = AverageMeter()
+            model.train()
             evaluator.reset()
-            with torch.no_grad():  # disable gradient computation
-                for i, sample in enumerate(val_loader):
-                    if args.dataset == 'solis':
-                        inputs, target = sample
-                    else:
-                        inputs, target = sample['image'], sample['label']
-                    if args.cuda:
-                        inputs, target = inputs.cuda(), target.cuda()
-                    outputs = model(inputs)
-                    val_loss = criterion(outputs, target)
-                    val_losses.update(val_loss.item(), args.batch_size)
+            tbar = tqdm(dataset_loader)
+            num_img_tr = len(dataset_loader)
+            if args.debug:
+                tracemalloc.start()
+                snapshot1 = tracemalloc.take_snapshot()
+            for i, sample in enumerate(tbar):
+                cur_iter = epoch * len(tbar) + i
+                scheduler(optimizer, cur_iter)
 
-                    # outputs = outputs.data.cpu().numpy()
-                    # target = target.cpu().numpy()
-                    # outputs = np.argmax(outputs, axis=1)
-                    # evaluator.add_batch(target, outputs)
-                    evaluator.add_batch(target.cpu().numpy(), np.argmax(
-                        outputs.data.cpu().numpy(), axis=1))
+                if args.dataset == 'solis':
+                    inputs, target = sample
+                else:
+                    inputs, target = sample['image'], sample['label']
 
-            print('Validation: epoch: {0}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
-                epoch + 1, loss=val_losses))
-            is_best = False
-            val_mIoU = write_epoch(writer, epoch, val_losses.avg, 'val')
-            if val_mIoU > best_pred:
-                is_best = True
-                best_pred = val_mIoU
-        # save model
+                if args.cuda:
+                    inputs, target = inputs.cuda(), target.cuda()
 
-        if epoch > args.epochs - 50 or epoch % 5 == 0:
-            saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'best_pred': best_pred,
-            }, is_best, filename=f'checkpoint_{epoch + 1}.pth.tar')
-            # torch.save({
-            #     'epoch': epoch + 1,
-            #     'state_dict': model.state_dict(),
-            #     'optimizer': optimizer.state_dict(),
-            # }, model_fname % (epoch + 1))
-        print('reset local total loss!')
+                outputs = model(inputs)
+                if args.backbone == 'solis':
+                    outputs = outputs['out']
+
+                loss = criterion(outputs, target)
+
+                if np.isnan(loss.item()) or np.isinf(loss.item()):
+                    pdb.set_trace()
+
+                losses.update(loss.item(), args.batch_size)
+
+                loss.backward()
+                optimizer.step()
+                optimizer.zero_grad()
+
+                evaluator.add_batch(target.cpu().numpy(), np.argmax(
+                    outputs.data.cpu().numpy(), axis=1))
+                # evaluator.add_batch(target, torch.argmax(
+                #     outputs.data, axis=1))
+
+                tbar.set_description('Train loss: %.3f' %
+                                     (losses.sum / (i + 1)))
+
+                if i % (num_img_tr // 10) == 0:
+                    global_step = i + num_img_tr * epoch
+                    summary.visualize_image(
+                        writer, args.dataset, inputs, target, outputs, global_step)
+
+            print('epoch: {0}\t''iter: {1}/{2}\t''lr: {3:.6f}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
+                epoch + 1, i + 1, len(dataset_loader), scheduler.get_lr(optimizer), loss=losses))
+
+            train_mIou = write_epoch(
+                writer, evaluator, 'train', epoch, losses.avg)
+
+            if args.debug:
+                snapshot2 = tracemalloc.take_snapshot()
+                top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+                with open(f'memory_log_{epoch}.txt', 'w') as f:
+                    print("[ Top 10 differences for epoch {} ]".format(
+                        epoch), file=f)
+                    for stat in top_stats[:10]:
+                        print(stat, file=f)
+                tracemalloc.stop()
+
+            # Validate after every 5 epochs
+            if epoch % 5 == 0:
+                val_losses = AverageMeter()
+                model.eval()  # set model to evaluation mode
+                evaluator.reset()
+                with torch.no_grad():  # disable gradient computation
+                    for i, sample in enumerate(val_loader):
+                        if args.dataset == 'solis':
+                            inputs, target = sample
+                        else:
+                            inputs, target = sample['image'], sample['label']
+                        if args.cuda:
+                            inputs, target = inputs.cuda(), target.cuda()
+                        outputs = model(inputs)
+                        if args.backbone == 'solis':
+                            outputs = outputs['out']
+                        val_loss = criterion(outputs, target)
+                        val_losses.update(val_loss.item(), args.batch_size)
+
+                        evaluator.add_batch(target.cpu().numpy(), np.argmax(
+                            outputs.data.cpu().numpy(), axis=1))
+                        # evaluator.add_batch(
+                        #     target, torch.argmax(outputs.data, axis=1))
+
+                print('Validation: epoch: {0}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
+                    epoch + 1, loss=val_losses))
+                is_best = False
+                val_mIoU = write_epoch(
+                    writer, evaluator, 'val', epoch, losses.avg)
+                if val_mIoU > best_pred:
+                    is_best = True
+                    best_pred = val_mIoU
+            # save model
+
+            if epoch > args.epochs - 50 or epoch % 5 == 0:
+                saver.save_checkpoint({
+                    'epoch': epoch + 1,
+                    'state_dict': model.state_dict(),
+                    'optimizer': optimizer.state_dict(),
+                    'best_pred': best_pred,
+                }, is_best, filename=f'checkpoint_{epoch + 1}.pth.tar')
+                # torch.save({
+                #     'epoch': epoch + 1,
+                #     'state_dict': model.state_dict(),
+                #     'optimizer': optimizer.state_dict(),
+                # }, model_fname % (epoch + 1))
+            print('reset local total loss!')
+    except Exception as e:
+        if 'out of memory' in str(e):
+            print('| WARNING: ran out of memory')
+            print(torch.cuda.memory_summary(device=torch.device('cuda')))
+        raise e
 
 
-def write_epoch(writer, evaluator, name, epoch, loss, cur_iter):
+def write_epoch(writer, evaluator, name, epoch, loss):
 
     Acc = evaluator.Pixel_Accuracy()
     Acc_class = evaluator.Pixel_Accuracy_Class()

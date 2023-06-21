@@ -77,32 +77,46 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
             SolisRandomVerticalFlip()
         ])
 
-        self.dataset = ChipFolderSegmentationDataset(
-            args, root, transform=transform)
+        # If retraining and we want to use all the data, use the dedicated train and val sets
+        if args.autodeeplab == 'train' and not args.num_images:
+            print("Using pre-defined train and val sets")
+            self.train_dataset = ChipFolderSegmentationDataset(
+                args, Path.db_root_dir('solis_train'), transform=transform)
+            self.val_dataset = ChipFolderSegmentationDataset(
+                args, Path.db_root_dir('solis_test'), transform=transform)
 
-        if args.autodeeplab == 'search' and args.use_ab and args.num_images:
-            train_dataset_size = int(len(self.dataset) * 2 / 2.25)
+            train_dataset_size = len(self.train_dataset)
+            val_dataset_size = len(self.val_dataset)
+
+        # else, use the standard random 80/20 train/val split
         else:
-            train_dataset_size = int(0.8 * len(self.dataset))
+            print("Using random 80/20 train/val split")
+            self.dataset = ChipFolderSegmentationDataset(
+                args, root, transform=transform)
 
-        val_dataset_size = len(self.dataset) - train_dataset_size
+            if args.autodeeplab == 'search' and args.use_ab and args.num_images:
+                train_dataset_size = int(len(self.dataset) * 2 / 2.25)
+            else:
+                train_dataset_size = int(0.8 * len(self.dataset))
 
-        self.train_dataset, self.val_dataset = torch.utils.data.random_split(
-            self.dataset,
-            [train_dataset_size, val_dataset_size])
+            val_dataset_size = len(self.dataset) - train_dataset_size
 
-        if args.autodeeplab == 'search' and args.use_ab:
-            self.train_dataset_a, self.train_dataset_b = torch.utils.data.random_split(
-                self.train_dataset,
-                [int(train_dataset_size / 2), int(train_dataset_size / 2)])
+            self.train_dataset, self.val_dataset = torch.utils.data.random_split(
+                self.dataset,
+                [train_dataset_size, val_dataset_size])
 
-            print("Found %d %s images" %
-                  (train_dataset_size / 2, "training (a and b)"))
-        else:
-            self.train_dataset_a = self.train_dataset
-            self.train_dataset_b = self.train_dataset
+            if args.autodeeplab == 'search' and args.use_ab:
+                self.train_dataset_a, self.train_dataset_b = torch.utils.data.random_split(
+                    self.train_dataset,
+                    [int(train_dataset_size / 2), int(train_dataset_size / 2)])
 
-            print("Found %d %s images" % (train_dataset_size, "training"))
+                print("Found %d %s images" %
+                      (train_dataset_size / 2, "training (a and b)"))
+            else:
+                self.train_dataset_a = self.train_dataset
+                self.train_dataset_b = self.train_dataset
+
+        print("Found %d %s images" % (train_dataset_size, "training"))
         print("Found %d %s images" % (val_dataset_size, "validation"))
 
     def train_dataloader(self):

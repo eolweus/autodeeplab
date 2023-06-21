@@ -11,6 +11,7 @@ import torch
 import warnings
 from rasterio.errors import NotGeoreferencedWarning
 
+import tracemalloc
 
 class ChipFolderClassificationDataset(DatasetFolder):
     def __init__(self, root: str, transform=None, target_transform=None):
@@ -38,7 +39,7 @@ class ChipFolderSegmentationDataset(Dataset):
         self.root = pathlib.Path(root)
         self.transform = transform
         self.args = args
-
+        
         num_images = args.num_images or None
         if args.use_ab and num_images:
                 num_images = int(num_images + num_images * 0.8)
@@ -82,6 +83,9 @@ class ChipFolderSegmentationDataset(Dataset):
         return len(self.chips)
 
     def __getitem__(self, key):
+        if self.args.debug:
+            tracemalloc.start()
+            snapshot1 = tracemalloc.take_snapshot()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", NotGeoreferencedWarning)
 
@@ -103,10 +107,15 @@ class ChipFolderSegmentationDataset(Dataset):
         # if self.args.num_bands == 3 only use band 3, 2 and 1 as red, green blue
         if self.args.num_bands == 3:
             data = data[[3, 2, 1], :, :]
-            # red = data[3:4, :, :]
-            # green = data[2:3, :, :]
-            # blue = data[1:2, :, :]
-            # data = torch.cat((red, green, blue), 0)
+        
+        if self.args.debug:
+            snapshot2 = tracemalloc.take_snapshot()
+            top_stats = snapshot2.compare_to(snapshot1, 'lineno')
+            with open(f'memory_log_loader.txt', 'w') as f:
+                print("[ Top 10 differences for item {} ]".format(key), file=f)
+                for stat in top_stats[:10]:
+                    print(stat, file=f)
+            tracemalloc.stop()
 
         return data, target
 
