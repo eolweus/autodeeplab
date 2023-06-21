@@ -1,14 +1,15 @@
 #!/bin/sh
 #SBATCH --partition=GPUQ
 #SBATCH --account=share-ie-idi
-#SBATCH --time=15:00:00
+#SBATCH --time=24:00:00
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
-#SBATCH --constraint=A100
+#SBATCH --gres=gpu:a100:1
+#SBATCH --constraint="gpu80g|gpu40g"
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=15000
+#SBATCH --mem=30g
+#SBATCH --cpus-per-task=4
 #SBATCH --job-name="2k"
-#SBATCH --output=~/autodeeplab/out/2k.out
+#SBATCH --output="/cluster/home/erlingfo/autodeeplab/out/2k.out"
 #SBATCH --mail-user=erlingfo@stud.ntnu.no
 #SBATCH --mail-type=ALL
 
@@ -23,46 +24,30 @@ echo "We are using $SLURM_CPUS_ON_NODE cores"
 echo "We are using $SLURM_CPUS_ON_NODE cores per node"
 echo "Total of $SLURM_NTASKS cores"
 
-# Clear and create the gpu_usage.log file
-truncate -s 0 gpu_usage_2k.log
+# GPU_MEMORY=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits)
 
-# Monitor GPU usage and log to a file
-while true; do
-    nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv >> gpu_usage_2k.log
-    sleep 10
-done &
-GPU_MONITOR_PID=$!
+# Now, adjust your batch size depending on the GPU memory size.
+# This is just an example; you'd adjust this condition and action to fit your needs.
+if [[ $GPU_MEMORY -gt 80000 ]]; then
+    BATCH_SIZE=22
+else
+    BATCH_SIZE=12
+fi
+# Clear and create the gpu_usage.log file
+#truncate -s 0 gpu_usage_2k.log
+
 
 module purge
 source ~/.bashrc
 # module load Anaconda3/2022.05
 module load CUDA/11.3.1
 conda activate autodl
+
 export PYTHONBUFFERED=1
-
-
-resume_flag=""
-while getopts ":r:" opt; do
-  case ${opt} in
-    r )
-      resume_flag="--resume ${OPTARG}"
-      ;;
-    \? )
-      echo "Invalid option: -$OPTARG" 1>&2
-      exit 1
-      ;;
-    : )
-      echo "Option -$OPTARG requires an argument." 1>&2
-      exit 1
-      ;;
-  esac
-done
-shift $((OPTIND -1))
-
-CUDA_VISIBLE_DEVICES=0 python train_autodeeplab.py \
-  --batch-size 10 \
+CUDA_VISIBLE_DEVICES=0 python ../train_autodeeplab.py \
+  --batch_size $BATCH_SIZE \
   --dataset solis \
-  --checkname no_bb_2040 \
+  --checkname "corr_2040_s21" \
   --alpha_epoch 20 \
   --filter_multiplier 8 \
   --resize 224 \
@@ -70,11 +55,8 @@ CUDA_VISIBLE_DEVICES=0 python train_autodeeplab.py \
   --num_bands 12 \
   --epochs 40 \
   --num_images 2040 \
-  --loss-type focal \
-  --use_amp \
-  $resume_flag
-
-# Stop the background GPU monitor process
-kill $GPU_MONITOR_PID
+  --loss-type ce \
+  --use_ab true \
+  --seed 21
 
 uname -a 

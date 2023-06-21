@@ -3,9 +3,11 @@
 #SBATCH --account=share-ie-idi
 #SBATCH --time=24:00:00
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:A100m80:1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --constraint="gpu80g|gpu40g"
 #SBATCH --ntasks-per-node=1
-#SBATCH --mem=20000
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=80G
 #SBATCH --job-name="rgb10k"
 #SBATCH --output="/cluster/home/erlingfo/autodeeplab/out/rgb10k.out"
 #SBATCH --mail-user=erlingfo@stud.ntnu.no
@@ -39,7 +41,7 @@ truncate -s 0 /cluster/home/erlingfo/autodeeplab/out/rgb10k_cpu_usage.log
 # Monitor GPU usage and log to a file
 while true; do
     nvidia-smi --query-gpu=index,name,temperature.gpu,utilization.gpu,utilization.memory,memory.total,memory.free,memory.used --format=csv >> /cluster/home/erlingfo/autodeeplab/out/rgb10k_gpu_usage.log
-    sleep 10
+    sleep 0.1
 done &
 GPU_MONITOR_PID=$!
 
@@ -47,20 +49,23 @@ GPU_MONITOR_PID=$!
 while true; do
     cpu_memory=$(free -m | awk 'NR==2{printf "Memory: %s/%sMB (%.2f%%)\n", $3,$2,$3*100/$2 }')
     echo "$cpu_memory" >> /cluster/home/erlingfo/autodeeplab/out/rgb10k_cpu_usage.log
-    sleep 10
+    sleep 1
 done &
+CPU_MONITOR_PID=$!
 
 module purge
 source ~/.bashrc
 # module load Anaconda3/2022.05
 module load CUDA/11.3.1
 conda activate autodl
+
 export PYTHONBUFFERED=1
-CUDA_VISIBLE_DEVICES=0 python /cluster/home/erlingfo/autodeeplab/train_autodeeplab.py \
- --batch-size $BATCH_SIZE --dataset solis --checkname "no_bb_rgb_10010" \
+echo "starting autodeeplab"
+CUDA_VISIBLE_DEVICES=0 python ../train_autodeeplab.py \
+ --batch_size $BATCH_SIZE --dataset solis --checkname "no_bb_rgb_10010" \
  --alpha_epoch 20 --filter_multiplier 8 --resize 224 --crop_size 224 \
- --num_bands 3 --epochs 40 --num_images 10010 --loss-type ce
- #--resume /cluster/home/erlingfo/autodeeplab/run/solis/no_bb_10010/experiment_0/checkpoint.pth.tar
+ --num_bands 3 --epochs 40 --num_images 10010 --loss-type ce --workers 8 \
+ --resume /cluster/home/erlingfo/autodeeplab/run/solis/no_bb_rgb_10010/experiment_6/checkpoint.pth.tar
 
 # Stop the background GPU monitor process
 kill $GPU_MONITOR_PID
