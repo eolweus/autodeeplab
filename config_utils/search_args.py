@@ -57,7 +57,7 @@ def obtain_search_args():
     parser.add_argument('--step', type=int, default=5)
     parser.add_argument('--alpha_epoch', type=int, default=20,
                         metavar='N', help='epoch to start training alphas')
-    parser.add_argument('--batch-size', type=int, default=2,
+    parser.add_argument('--batch_size', type=int, default=2,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
@@ -111,5 +111,7 @@ def obtain_search_args():
                         type=bool, help='whether use affine in BN')
     parser.add_argument('--multi_scale', default=(0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0),
                         type=bool, help='whether use multi_scale in train')
+    parser.add_argument('--debug', default=False,
+                        type=bool, help='whether use debug mode in train')
     args = parser.parse_args()
     return args

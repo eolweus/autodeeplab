@@ -100,6 +100,8 @@ def make_data_loader(args, **kwargs):
             dataset = solis_data_module.ChipFolderSegmentationDatamodule(args)
             if args.use_ab and args.autodeeplab == 'search':
                 train_loader1, train_loader2 = dataset.train_dataloader_ab()
+            elif args.autodeeplab == 'train':
+                train_loader1 = dataset.train_dataloader()
             else:
                 train_loader1 = dataset.train_dataloader()
                 train_loader2 = train_loader1
