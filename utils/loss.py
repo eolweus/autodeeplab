@@ -11,6 +11,7 @@ class SegmentationLosses(object):
         self.size_average = size_average
         self.cuda = cuda
         self.batch_average = batch_average
+        self.criterion = None
 
     def build_loss(self, mode='ce'):
         """Choices: ['ce', 'focal']"""
@@ -22,14 +23,16 @@ class SegmentationLosses(object):
             raise NotImplementedError
 
     def CrossEntropyLoss(self, logit, target):
-        n, c, h, w = logit.size()
-        reduction = 'mean' if self.size_average else 'none'
-        criterion = nn.CrossEntropyLoss(
-            weight=self.weight, ignore_index=self.ignore_index, reduction=reduction)
-        if self.cuda:
-            criterion = criterion.cuda()
+        # n, c, h, w = logit.size()
 
-        loss = criterion(logit, target.long())
+        if self.criterion is None:
+            reduction = 'mean' if self.size_average else 'none'
+            self.criterion = nn.CrossEntropyLoss(
+                weight=self.weight, ignore_index=self.ignore_index, reduction=reduction)
+            if self.cuda:
+                self.criterion = self.criterion.cuda()
+
+        loss = self.criterion(logit, target.long())
 
         if self.batch_average and not self.size_average:
             loss = loss.mean()

@@ -19,22 +19,22 @@ def process_cell(path, filename='cell_arc.png'):
 
     # Define edges
     edges = {
-        0: ['S0', 'H1'],
-        1: ['S1', 'H1'],
-        2: ['S0', 'H2'],
-        3: ['S1', 'H2'],
+        0: ['l -2', 'H1'],
+        1: ['l -1', 'H1'],
+        2: ['l -2', 'H2'],
+        3: ['l -1', 'H2'],
         4: ['H1', 'H2'],
-        5: ['S0', 'H3'],
-        6: ['S1', 'H3'],
+        5: ['l -2', 'H3'],
+        6: ['l -1', 'H3'],
         7: ['H1', 'H3'],
         8: ['H2', 'H3'],
-        9: ['S0', 'H4'],
-        10: ['S1', 'H4'],
+        9: ['l -2', 'H4'],
+        10: ['l -1', 'H4'],
         11: ['H1', 'H4'],
         12: ['H2', 'H4'],
         13: ['H3', 'H4'],
-        14: ['S0', 'H5'],
-        15: ['S1', 'H5'],
+        14: ['l -2', 'H5'],
+        15: ['l -1', 'H5'],
         16: ['H1', 'H5'],
         17: ['H2', 'H5'],
         18: ['H3', 'H5'],
@@ -45,16 +45,15 @@ def process_cell(path, filename='cell_arc.png'):
         'H1': 'red',
         'H2': 'blue',
         'H3': 'green',
-        'H4': 'brown',
+        'H4': 'orange',
         'H5': 'purple',
-        'end': 'black'
     }
 
     # Load cell from npy file
     cell = np.load(path)
 
     # Initialize the final structure
-    structure = {'S0': [], 'S1': [], 'H1': [],
+    structure = {'l -2': [], 'l -1': [], 'H1': [],
                  'H2': [], 'H3': [], 'H4': [], 'H5': []}
 
     # Process the cell
@@ -77,16 +76,20 @@ def process_cell(path, filename='cell_arc.png'):
 
     G = pgv.AGraph(directed=True, rankdir='LR')
 
-    # Add end to all nodes
-    for node in structure.keys():
-        if node != 'S0' and node != 'S1':
-            structure[node].append('. end')
+    G.add_node('l -2', color='lightblue', style='filled', shape='box')
+    G.add_node('l -1', color='lightblue', style='filled', shape='box')
 
     # Add nodes and edges to the graph
     for source, ops in structure.items():
         for operation in ops:
             op, target = operation.split()
-            G.add_edge(source, target, label=op, color=edge_colors[target])
+            if op != 'none':
+                G.add_edge(source, target, label=op, color=edge_colors[target])
+
+    # Add concat node
+    for node in structure.keys():
+        if node != 'l -2' and node != 'l -1':
+            G.add_edge(node, 'concat', color='black')
 
     # Set the layout to 'dot', which creates a hierarchical layout
     G.layout(prog='dot')
