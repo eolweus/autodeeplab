@@ -20,19 +20,24 @@ from utils.loss import build_criterion
 from utils.step_lr_scheduler import Iter_LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
-from retrain_model.build_autodeeplab import Retrain_Autodeeplab
+from retrain_model.build_autodeeplab import Retrain_Autodeeplab, Retrain_Autodeeplab2
 from config_utils.re_train_autodeeplab import obtain_retrain_autodeeplab_args
 
 import tracemalloc
 
 
 def main():
-    # get dataloader
+
     warnings.filterwarnings('ignore')
     assert torch.cuda.is_available()
     torch.backends.cudnn.benchmark = True
     args = obtain_retrain_autodeeplab_args()
     model_fname = f'{args.checkname}_epoch%d.pth'
+
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+
+    # get dataloader
     if args.checkname is None:
         model_fname = 'data/deeplab_{0}_{1}_v3_{2}_epoch%d.pth'.format(
             args.backbone, args.dataset, args.exp)
@@ -52,9 +57,6 @@ def main():
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
-
     saver = Saver(args)
     saver.save_experiment_config()
     # Define Tensorboard Summary
@@ -64,7 +66,11 @@ def main():
 
     # get model
     if args.backbone == 'autodeeplab':
-        model = Retrain_Autodeeplab(args)
+        if args.use_new_model:
+            model = Retrain_Autodeeplab2(args)
+        else:
+            model = Retrain_Autodeeplab(args)
+
     elif args.backbone == 'solis':
         model = deeplabv3_resnet50()
     else:
@@ -183,41 +189,39 @@ def main():
                         print(stat, file=f)
                 tracemalloc.stop()
 
-            # Validate after every 5 epochs
-            if epoch % 5 == 0:
-                val_losses = AverageMeter()
-                model.eval()  # set model to evaluation mode
-                evaluator.reset()
-                with torch.no_grad():  # disable gradient computation
-                    for i, sample in enumerate(val_loader):
-                        if args.dataset == 'solis':
-                            inputs, target = sample
-                        else:
-                            inputs, target = sample['image'], sample['label']
-                        if args.cuda:
-                            inputs, target = inputs.cuda(), target.cuda()
-                        outputs = model(inputs)
-                        if args.backbone == 'solis':
-                            outputs = outputs['out']
-                        val_loss = criterion(outputs, target)
-                        val_losses.update(val_loss.item(), args.batch_size)
+            # Validate after every
+            # if epoch % 5 == 0:
+            val_losses = AverageMeter()
+            model.eval()  # set model to evaluation mode
+            evaluator.reset()
+            with torch.no_grad():  # disable gradient computation
+                for i, sample in enumerate(val_loader):
+                    if args.dataset == 'solis':
+                        inputs, target = sample
+                    else:
+                        inputs, target = sample['image'], sample['label']
+                    if args.cuda:
+                        inputs, target = inputs.cuda(), target.cuda()
+                    outputs = model(inputs)
+                    if args.backbone == 'solis':
+                        outputs = outputs['out']
+                    val_loss = criterion(outputs, target)
+                    val_losses.update(val_loss.item(), args.batch_size)
 
-                        evaluator.add_batch(target.cpu().numpy(), np.argmax(
-                            outputs.data.cpu().numpy(), axis=1))
-                        # evaluator.add_batch(
-                        #     target, torch.argmax(outputs.data, axis=1))
+                    evaluator.add_batch(target.cpu().numpy(), np.argmax(
+                        outputs.data.cpu().numpy(), axis=1))
 
-                print('Validation: epoch: {0}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
-                    epoch + 1, loss=val_losses))
-                is_best = False
-                val_mIoU = write_epoch(
-                    writer, evaluator, 'val', epoch, losses.avg)
-                if val_mIoU > best_pred:
-                    is_best = True
-                    best_pred = val_mIoU
+            print('Validation: epoch: {0}\t''loss: {loss.val:.4f} ({loss.ema:.4f})'.format(
+                epoch + 1, loss=val_losses))
+            is_best = False
+            val_mIoU = write_epoch(
+                writer, evaluator, 'val', epoch, losses.avg)
+            if val_mIoU > best_pred:
+                is_best = True
+                best_pred = val_mIoU
             # save model
 
-            if epoch > args.epochs - 50 or epoch % 5 == 0:
+            if epoch > args.epochs - 10 or epoch % 5 == 0 or is_best:
                 saver.save_checkpoint({
                     'epoch': epoch + 1,
                     'state_dict': model.state_dict(),

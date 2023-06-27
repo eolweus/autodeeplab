@@ -75,6 +75,7 @@ def obtain_retrain_autodeeplab_args():
                         default=None, help='ratio of images from the total solis dataset')
     parser.add_argument('--cuda', type=bool, default=True)
     parser.add_argument('--debug', type=bool, default=False)
+    parser.add_argument('--use_new_model', type=bool, default=False)
 
     args = parser.parse_args()
     return args

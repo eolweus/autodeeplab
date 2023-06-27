@@ -30,8 +30,9 @@ class Saver(object):
             torch.save(state, filename)
             if is_best:
                 best_pred = state['best_pred']
+                best_state = f'best_pred: {best_pred}, epoch: {state["epoch"]}'
                 with open(os.path.join(self.experiment_dir, 'best_pred.txt'), 'w') as f:
-                    f.write(str(best_pred))
+                    f.write(best_state)
                 if self.runs:
                     previous_miou = [0.0]
                     for run in self.runs:
@@ -40,7 +41,13 @@ class Saver(object):
                             str(run_id)), 'best_pred.txt')
                         if os.path.exists(path):
                             with open(path, 'r') as f:
-                                miou = float(f.readline())
+                                text = f.readline()
+                                try:
+                                    miou = float(text)
+                                except:
+                                    miou = float(
+                                        next(s.split(": ")[1] for s in text.split(", ") if "best_pred" in s))
+
                                 previous_miou.append(miou)
                         else:
                             continue
