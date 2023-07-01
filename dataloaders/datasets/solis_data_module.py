@@ -76,9 +76,17 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
             SolisRandomHorizontalFlip(),
             SolisRandomVerticalFlip()
         ])
+        # If we are infering, use the dedicated infer set
+        if args.autodeeplab == 'infer' and not args.num_images:
+            print("Infering on all images")
+            transform = SolisCompose([
+                SolisNormalize(mean, std),
+            ])
+            self.dataset = ChipFolderSegmentationDataset(
+                args, Path.db_root_dir('solis_infer'), transform=transform)
 
         # If retraining and we want to use all the data, use the dedicated train and val sets
-        if args.autodeeplab == 'train' and not args.num_images:
+        elif args.autodeeplab == 'train' and not args.num_images:
             print("Using pre-defined train and val sets")
             self.train_dataset = ChipFolderSegmentationDataset(
                 args, Path.db_root_dir('solis_train'), transform=transform)
@@ -116,8 +124,9 @@ class ChipFolderSegmentationDatamodule(pl.LightningDataModule):
                 self.train_dataset_a = self.train_dataset
                 self.train_dataset_b = self.train_dataset
 
-        print("Found %d %s images" % (train_dataset_size, "training"))
-        print("Found %d %s images" % (val_dataset_size, "validation"))
+        # print("Found %d %s images" % (train_dataset_size, "training"))
+        # print("Found %d %s images" % (val_dataset_size, "validation"))
+        print("Found %d %s images" % (len(self.dataset), "validation"))
 
     def train_dataloader(self):
         if self.use_ab:

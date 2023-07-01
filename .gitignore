@@ -14,4 +14,4 @@ mypath.py
 nohup.out
 gpu_usage.log
 out/
-
+memory_logs/

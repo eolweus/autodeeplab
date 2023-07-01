@@ -117,6 +117,8 @@ class ChipFolderSegmentationDataset(Dataset):
                     print(stat, file=f)
             tracemalloc.stop()
 
+        if self.args.autodeeplab == "infer":
+            return data, target, self.chips[key][0].name
         return data, target
 
 
