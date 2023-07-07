@@ -1,3 +1,5 @@
+This is a copy of git@github.com:NoamRosenberg/autodeeplab.git modified for my CS master thesis
+
 # AutoML for Image Semantic Segmentation
 Currently this repo contains the only working open-source implementation of [Auto-Deeplab](https://arxiv.org/abs/1901.02985) which, by the way **out-performs** that of the original paper. 
 
