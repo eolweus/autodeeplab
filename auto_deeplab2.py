@@ -65,7 +65,7 @@ class AutoDeeplab(nn.Module):
             self.backbone = None
 
         self.stem0 = nn.Sequential(
-            nn.Conv2d(num_bands, half_f_initial * self._block_multiplier,
+            nn.Conv2d(self.num_bands, half_f_initial * self._block_multiplier,
                       3, stride=2, padding=1),
             nn.BatchNorm2d(half_f_initial * self._block_multiplier),
             nn.ReLU()
@@ -201,13 +201,7 @@ class AutoDeeplab(nn.Module):
         )
 
     def forward(self, x):
-        # TODO: GET RID OF THESE LISTS, we dont need to keep everything.
-        # TODO: Is this the reason for the memory issue ?
         # Check the chatgpt code above "benefits of avocado" for a better way to do this
-        self.level_4 = []
-        self.level_8 = []
-        self.level_16 = []
-        self.level_32 = []
         if self.backbone is not None:
             with torch.no_grad():
                 # ResNet backbone returns a dict with keys 'out' and 'aux'
@@ -216,11 +210,11 @@ class AutoDeeplab(nn.Module):
                 # We only need 'out' for the decoder
                 temp = self.backbone(x)['out']
                 print(temp.shape)
-            self.level_4.append(self.stem2(temp))
+            level_4_curr = self.stem2(temp)
         else:
             temp = self.stem0(x)
             temp = self.stem1(temp)
-            self.level_4.append(self.stem2(temp))
+            level_4_curr = self.stem2(temp)
         # Solis
 
         count = 0
@@ -259,7 +253,7 @@ class AutoDeeplab(nn.Module):
                     normalized_betas[layer][2] = F.softmax(
                         self.betas[layer][2].to(device=img_device), dim=-1)
                     normalized_betas[layer][3][:2] = F.softmax(
-                        self.betas[layer][3][:1].to(device=img_device), dim=-1) * (2 / 3)
+                        self.betas[layer][3][:2].to(device=img_device), dim=-1) * (2 / 3)
 
         else:
             normalized_alphas = F.softmax(self.alphas, dim=-1)
@@ -292,74 +286,73 @@ class AutoDeeplab(nn.Module):
                     normalized_betas[layer][3][:2] = F.softmax(
                         self.betas[layer][3][:2], dim=-1) * (2 / 3)
 
+        # instantiate the level 4, 8, 16, 32 cells
+        level_8_curr = None
+        level_16_curr = None
+        level_32_curr = None
+
         for layer in range(self._num_layers):
 
+            level_4_prev = level_4_curr
+            level_8_prev = level_8_curr
+            level_16_prev = level_16_curr
+            level_32_prev = level_32_curr
+
             if layer == 0:
-                level4_new, = self.cells[count](
-                    None, None, self.level_4[-1], None, normalized_alphas)
+                level_4_new, = self.cells[count](
+                    None, None, level_4_curr, None, normalized_alphas)
                 count += 1
-                level8_new, = self.cells[count](
-                    None, self.level_4[-1], None, None, normalized_alphas)
+                level_8_new, = self.cells[count](
+                    None, level_4_curr, None, None, normalized_alphas)
                 count += 1
 
-                level4_new = normalized_betas[layer][0][1] * level4_new
-                level8_new = normalized_betas[layer][0][2] * level8_new
-                self.level_4.append(level4_new)
-                self.level_8.append(level8_new)
+                level_4_curr = normalized_betas[layer][0][1] * level_4_new
+                level_8_curr = normalized_betas[layer][0][2] * level_8_new
 
             elif layer == 1:
-                level4_new_1, level4_new_2 = self.cells[count](self.level_4[-2],
-                                                               None,
-                                                               self.level_4[-1],
-                                                               self.level_8[-1],
-                                                               normalized_alphas)
+                level4_new_1, level4_new_2 = self.cells[count](
+                    level_4_prev, None, level_4_curr, level_8_curr, normalized_alphas)
                 count += 1
                 level4_new = normalized_betas[layer][0][1] * \
                     level4_new_1 + normalized_betas[layer][1][0] * level4_new_2
 
-                level8_new_1, level8_new_2 = self.cells[count](None,
-                                                               self.level_4[-1],
-                                                               self.level_8[-1],
-                                                               None,
-                                                               normalized_alphas)
+                level8_new_1, level8_new_2 = self.cells[count](
+                    None, level_4_curr, level_8_curr, None, normalized_alphas)
                 count += 1
                 level8_new = normalized_betas[layer][0][2] * \
                     level8_new_1 + normalized_betas[layer][1][2] * level8_new_2
 
-                level16_new, = self.cells[count](None,
-                                                 self.level_8[-1],
-                                                 None,
-                                                 None,
-                                                 normalized_alphas)
+                level16_new, = self.cells[count](
+                    None, level_8_curr, None, None, normalized_alphas)
                 level16_new = normalized_betas[layer][1][2] * level16_new
                 count += 1
 
-                self.level_4.append(level4_new)
-                self.level_8.append(level8_new)
-                self.level_16.append(level16_new)
+                level_4_curr = level4_new
+                level_8_curr = level8_new
+                level_16_curr = level16_new
 
             elif layer == 2:
-                level4_new_1, level4_new_2 = self.cells[count](self.level_4[-2],
+                level4_new_1, level4_new_2 = self.cells[count](level_4_prev,
                                                                None,
-                                                               self.level_4[-1],
-                                                               self.level_8[-1],
+                                                               level_4_curr,
+                                                               level_8_curr,
                                                                normalized_alphas)
                 count += 1
                 level4_new = normalized_betas[layer][0][1] * \
                     level4_new_1 + normalized_betas[layer][1][0] * level4_new_2
 
-                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](self.level_8[-2],
-                                                                             self.level_4[-1],
-                                                                             self.level_8[-1],
-                                                                             self.level_16[-1],
+                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](level_8_prev,
+                                                                             level_4_curr,
+                                                                             level_8_curr,
+                                                                             level_16_curr,
                                                                              normalized_alphas)
                 count += 1
                 level8_new = normalized_betas[layer][0][2] * level8_new_1 + normalized_betas[layer][1][1] * level8_new_2 + normalized_betas[layer][2][
                     0] * level8_new_3
 
                 level16_new_1, level16_new_2 = self.cells[count](None,
-                                                                 self.level_8[-1],
-                                                                 self.level_16[-1],
+                                                                 level_8_curr,
+                                                                 level_16_curr,
                                                                  None,
                                                                  normalized_alphas)
                 count += 1
@@ -368,49 +361,49 @@ class AutoDeeplab(nn.Module):
                     normalized_betas[layer][2][1] * level16_new_2
 
                 level32_new, = self.cells[count](None,
-                                                 self.level_16[-1],
+                                                 level_16_curr,
                                                  None,
                                                  None,
                                                  normalized_alphas)
                 level32_new = normalized_betas[layer][2][2] * level32_new
                 count += 1
 
-                self.level_4.append(level4_new)
-                self.level_8.append(level8_new)
-                self.level_16.append(level16_new)
-                self.level_32.append(level32_new)
+                level_4_curr = level4_new
+                level_8_curr = level8_new
+                level_16_curr = level16_new
+                level_32_curr = level32_new
 
             elif layer == 3:
-                level4_new_1, level4_new_2 = self.cells[count](self.level_4[-2],
+                level4_new_1, level4_new_2 = self.cells[count](level_4_prev,
                                                                None,
-                                                               self.level_4[-1],
-                                                               self.level_8[-1],
+                                                               level_4_curr,
+                                                               level_8_curr,
                                                                normalized_alphas)
                 count += 1
                 level4_new = normalized_betas[layer][0][1] * \
                     level4_new_1 + normalized_betas[layer][1][0] * level4_new_2
 
-                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](self.level_8[-2],
-                                                                             self.level_4[-1],
-                                                                             self.level_8[-1],
-                                                                             self.level_16[-1],
+                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](level_8_prev,
+                                                                             level_4_curr,
+                                                                             level_8_curr,
+                                                                             level_16_curr,
                                                                              normalized_alphas)
                 count += 1
                 level8_new = normalized_betas[layer][0][2] * level8_new_1 + normalized_betas[layer][1][1] * level8_new_2 + normalized_betas[layer][2][
                     0] * level8_new_3
 
-                level16_new_1, level16_new_2, level16_new_3 = self.cells[count](self.level_16[-2],
-                                                                                self.level_8[-1],
-                                                                                self.level_16[-1],
-                                                                                self.level_32[-1],
+                level16_new_1, level16_new_2, level16_new_3 = self.cells[count](level_16_prev,
+                                                                                level_8_curr,
+                                                                                level_16_curr,
+                                                                                level_32_curr,
                                                                                 normalized_alphas)
                 count += 1
                 level16_new = normalized_betas[layer][1][2] * level16_new_1 + normalized_betas[layer][2][1] * level16_new_2 + normalized_betas[layer][3][
                     0] * level16_new_3
 
                 level32_new_1, level32_new_2 = self.cells[count](None,
-                                                                 self.level_16[-1],
-                                                                 self.level_32[-1],
+                                                                 level_16_curr,
+                                                                 level_32_curr,
                                                                  None,
                                                                  normalized_alphas)
                 count += 1
@@ -418,43 +411,43 @@ class AutoDeeplab(nn.Module):
                     level32_new_1 + \
                     normalized_betas[layer][3][1] * level32_new_2
 
-                self.level_4.append(level4_new)
-                self.level_8.append(level8_new)
-                self.level_16.append(level16_new)
-                self.level_32.append(level32_new)
+                level_4_curr = level4_new
+                level_8_curr = level8_new
+                level_16_curr = level16_new
+                level_32_curr = level32_new
 
             else:
-                level4_new_1, level4_new_2 = self.cells[count](self.level_4[-2],
+                level4_new_1, level4_new_2 = self.cells[count](level_4_prev,
                                                                None,
-                                                               self.level_4[-1],
-                                                               self.level_8[-1],
+                                                               level_4_curr,
+                                                               level_8_curr,
                                                                normalized_alphas)
                 count += 1
                 level4_new = normalized_betas[layer][0][1] * \
                     level4_new_1 + normalized_betas[layer][1][0] * level4_new_2
 
-                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](self.level_8[-2],
-                                                                             self.level_4[-1],
-                                                                             self.level_8[-1],
-                                                                             self.level_16[-1],
+                level8_new_1, level8_new_2, level8_new_3 = self.cells[count](level_8_prev,
+                                                                             level_4_curr,
+                                                                             level_8_curr,
+                                                                             level_16_curr,
                                                                              normalized_alphas)
                 count += 1
 
                 level8_new = normalized_betas[layer][0][2] * level8_new_1 + normalized_betas[layer][1][1] * level8_new_2 + normalized_betas[layer][2][
                     0] * level8_new_3
 
-                level16_new_1, level16_new_2, level16_new_3 = self.cells[count](self.level_16[-2],
-                                                                                self.level_8[-1],
-                                                                                self.level_16[-1],
-                                                                                self.level_32[-1],
+                level16_new_1, level16_new_2, level16_new_3 = self.cells[count](level_16_prev,
+                                                                                level_8_curr,
+                                                                                level_16_curr,
+                                                                                level_32_curr,
                                                                                 normalized_alphas)
                 count += 1
                 level16_new = normalized_betas[layer][1][2] * level16_new_1 + normalized_betas[layer][2][1] * level16_new_2 + normalized_betas[layer][3][
                     0] * level16_new_3
 
-                level32_new_1, level32_new_2 = self.cells[count](self.level_32[-2],
-                                                                 self.level_16[-1],
-                                                                 self.level_32[-1],
+                level32_new_1, level32_new_2 = self.cells[count](level_32_prev,
+                                                                 level_16_curr,
+                                                                 level_32_curr,
                                                                  None,
                                                                  normalized_alphas)
                 count += 1
@@ -462,20 +455,15 @@ class AutoDeeplab(nn.Module):
                     level32_new_1 + \
                     normalized_betas[layer][3][1] * level32_new_2
 
-                self.level_4.append(level4_new)
-                self.level_8.append(level8_new)
-                self.level_16.append(level16_new)
-                self.level_32.append(level32_new)
+                level_4_curr = level4_new
+                level_8_curr = level8_new
+                level_16_curr = level16_new
+                level_32_curr = level32_new
 
-            self.level_4 = self.level_4[-2:]
-            self.level_8 = self.level_8[-2:]
-            self.level_16 = self.level_16[-2:]
-            self.level_32 = self.level_32[-2:]
-
-        aspp_result_4 = self.aspp_4(self.level_4[-1])
-        aspp_result_8 = self.aspp_8(self.level_8[-1])
-        aspp_result_16 = self.aspp_16(self.level_16[-1])
-        aspp_result_32 = self.aspp_32(self.level_32[-1])
+        aspp_result_4 = self.aspp_4(level_4_curr)
+        aspp_result_8 = self.aspp_8(level_8_curr)
+        aspp_result_16 = self.aspp_16(level_16_curr)
+        aspp_result_32 = self.aspp_32(level_32_curr)
         upsample = nn.Upsample(
             size=x.size()[2:], mode='bilinear', align_corners=True)
         aspp_result_4 = upsample(aspp_result_4)

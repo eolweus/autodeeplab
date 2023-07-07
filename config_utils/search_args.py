@@ -4,26 +4,36 @@ import argparse
 def obtain_search_args():
     parser = argparse.ArgumentParser(
         description="PyTorch DeeplabV3Plus Training")
-    parser.add_argument('--backbone', type=str, default='resnet',
-                        choices=['resnet', 'xception', 'drn', 'mobilenet'],
-                        help='backbone name (default: resnet)')
+    parser.add_argument('--backbone', type=str, default=None,
+                        choices=['resnet', 'xception', 'drn',
+                                 'mobilenet', 'solis_resnet50'],
+                        help='backbone name (default: resnet)'),
+    parser.add_argument('--num_bands', type=int,
+                        default=3, help='number of bands')
+    parser.add_argument('--num_images', type=int,
+                        default=None, help='number of images from from solis dataset')
+    parser.add_argument('--subset_ratio', type=float,
+                        default=None, help='ratio of images from the total solis dataset')
     parser.add_argument('--opt_level', type=str, default='O0',
                         choices=['O0', 'O1', 'O2', 'O3'],
                         help='opt level for half percision training (default: O0)')
     parser.add_argument('--out-stride', type=int, default=16,
                         help='network output stride (default: 8)')
     parser.add_argument('--dataset', type=str, default='cityscapes',
-                        choices=['pascal', 'coco', 'cityscapes', 'kd'],
+                        choices=['pascal', 'coco',
+                                 'cityscapes', 'kd', 'solis'],
                         help='dataset name (default: pascal)')
     parser.add_argument('--autodeeplab', type=str, default='search',
                         choices=['search', 'train'])
+    parser.add_argument('--use_ab', type=bool, default=False,
+                        help='split training data into A and B')
     parser.add_argument('--use-sbd', action='store_true', default=False,
                         help='whether to use SBD dataset (default: True)')
     parser.add_argument('--load-parallel', type=int, default=0)
     parser.add_argument('--clean-module', type=int, default=0)
-    parser.add_argument('--workers', type=int, default=0,
+    parser.add_argument('--workers', type=int, default=4,
                         metavar='N', help='dataloader threads')
-    parser.add_argument('--base_size', type=int, default=320,
+    parser.add_argument('--base_size', type=int, default=2,
                         help='base image size')
     parser.add_argument('--crop_size', type=int, default=321,
                         help='crop image size')
@@ -47,7 +57,7 @@ def obtain_search_args():
     parser.add_argument('--step', type=int, default=5)
     parser.add_argument('--alpha_epoch', type=int, default=20,
                         metavar='N', help='epoch to start training alphas')
-    parser.add_argument('--batch-size', type=int, default=2,
+    parser.add_argument('--batch_size', type=int, default=2,
                         metavar='N', help='input batch size for \
                                 training (default: auto)')
     parser.add_argument('--test-batch-size', type=int, default=None,
@@ -82,8 +92,8 @@ def obtain_search_args():
     parser.add_argument('--gpu-ids', type=str, default='0',
                         help='use which gpu to train, must be a \
                         comma-separated list of integers only (default=0)')
-    parser.add_argument('--seed', type=int, default=1, metavar='S',
-                        help='random seed (default: 1)')
+    parser.add_argument('--seed', type=int, default=42, metavar='S',
+                        help='random seed (default: 42)')
     # checking point
     parser.add_argument('--resume', type=str, default=None,
                         help='put the path to resuming file if needed')
@@ -101,5 +111,7 @@ def obtain_search_args():
                         type=bool, help='whether use affine in BN')
     parser.add_argument('--multi_scale', default=(0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0),
                         type=bool, help='whether use multi_scale in train')
+    parser.add_argument('--debug', default=False,
+                        type=bool, help='whether use debug mode in train')
     args = parser.parse_args()
     return args

@@ -1,6 +1,7 @@
 import torch.nn.functional as F
 from operations import *
 from genotypes import PRIMITIVES
+import math
 
 
 class MixedOp(nn.Module):
@@ -68,7 +69,10 @@ class Cell(nn.Module):
 
     def scale_dimension(self, dim, scale):
         assert isinstance(dim, int)
-        return int((float(dim) - 1.0) * scale + 1.0) if dim % 2 else int(dim * scale)
+        if scale < 1 and dim % 2:  # Special case if odd number and downscaling.
+            return int(math.floor((float(dim) - 1.0) * scale + 1.0))
+        else:
+            return int(dim * scale)
 
     def prev_feature_resize(self, prev_feature, mode):
         if mode == 'down':
@@ -95,8 +99,8 @@ class Cell(nn.Module):
             size_h, size_w = s1_up.shape[2], s1_up.shape[3]
         all_states = []
         if s0 is not None:
-            # s0 = self.pre_preprocess(s0)
-            s0 = F.interpolate(s0, (size_h, size_w), mode='bilinear', align_corners=True) if (s0.shape[2] != size_h) or (s0.shape[3] != size_w) else s0
+            s0 = F.interpolate(s0, (size_h, size_w), mode='bilinear', align_corners=True) if (
+                s0.shape[2] != size_h) or (s0.shape[3] != size_w) else s0
             s0 = self.pre_preprocess(s0) if (s0.shape[1] != self.C_out) else s0
             if s1_down is not None:
                 states_down = [s0, s1_down]
@@ -138,7 +142,6 @@ class Cell(nn.Module):
             concat_feature = torch.cat(states[-self.block_multiplier:], dim=1)
             final_concates.append(concat_feature)
         return final_concates
-
 
     def _initialize_weights(self):
         for m in self.modules():

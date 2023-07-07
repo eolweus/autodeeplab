@@ -1,5 +1,5 @@
 # from dataloaders.datasets import cityscapes, kd, coco, combine_dbs, pascal, sbd, solis
-from dataloaders.datasets import cityscapes, combine_dbs, pascal, sbd
+from dataloaders.datasets import cityscapes, combine_dbs, pascal, sbd, solis_data_module
 from torch.utils.data import DataLoader
 import torch.utils.data.distributed
 
@@ -96,46 +96,25 @@ def make_data_loader(args, **kwargs):
             elif args.autodeeplab == 'train':
                 return train_loader, num_class
 
-        # elif args.dataset == 'coco':
-        #     train_set = coco.COCOSegmentation(args, split='train')
-        #     val_set = coco.COCOSegmentation(args, split='val')
-        #     num_class = train_set.NUM_CLASSES
-        #     train_loader = DataLoader(
-        #         train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
-        #     val_loader = DataLoader(
-        #         val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
-        #     test_loader = None
-        #     return train_loader, train_loader, val_loader, test_loader, num_class
+        elif args.dataset == 'solis':
+            dataset = solis_data_module.ChipFolderSegmentationDatamodule(args)
+            if args.autodeeplab == 'infer':
+                data_loader = dataset.predict_dataloader()
+                return data_loader
 
-        # elif args.dataset == 'kd':
-        #     train_set = kd.CityscapesSegmentation(args, split='train')
-        #     val_set = kd.CityscapesSegmentation(args, split='val')
-        #     test_set = kd.CityscapesSegmentation(args, split='test')
-        #     num_class = train_set.NUM_CLASSES
-        #     train_loader1 = DataLoader(
-        #         train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
-        #     train_loader2 = DataLoader(
-        #         train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
-        #     val_loader = DataLoader(
-        #         val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
-        #     test_loader = DataLoader(
-        #         test_set, batch_size=args.batch_size, shuffle=False, **kwargs)
+            elif args.use_ab and args.autodeeplab == 'search':
+                train_loader1, train_loader2 = dataset.train_dataloader_ab()
+            elif args.autodeeplab == 'train':
+                train_loader1 = dataset.train_dataloader()
+            else:
+                train_loader1 = dataset.train_dataloader()
+                train_loader2 = train_loader1
+            val_loader = dataset.val_dataloader()
+            num_class = 2
+            test_loader = None
+            if args.autodeeplab == 'train':
+                return train_loader1, val_loader
+            return train_loader1, train_loader2, val_loader, test_loader, num_class
 
-        #     return train_loader1, train_loader2, val_loader, test_loader, num_class
-
-        # TODO: install rasterio and uncomment this
-        # elif args.dataset == 'solis':
-        #     # TODO: fix this to use the new dataset
-        #     # insert solis dataset path
-        #     train_set = solis.ChipFolderSegmentationDataset(args)
-        #     val_set = solis.ChipFolderSegmentationDataset(args)
-        #     num_class = 2
-        #     train_loader = DataLoader(
-        #         train_set, batch_size=args.batch_size, shuffle=True, **kwargs)
-        #     val_loader = DataLoader(
-        #         val_set, batch_size=args.batch_size, shuffle=False, **kwargs)
-        #     test_loader = None
-        #     return train_loader, train_loader, val_loader, test_loader, num_class
-
-        # else:
-        #     raise NotImplementedError
+        else:
+            raise NotImplementedError

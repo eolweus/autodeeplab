@@ -5,20 +5,22 @@ from modeling.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 # TODO: NOW I DONT KNOW HOW TO USE ABN ON WINDOWS SYSTEM
 
-if platform.system() == 'Windows':
+# if platform.system() == 'Windows':
 
-    class ABN(nn.Module):
-        def __init__(self, C_out, affine=False):
-            super(ABN, self).__init__()
-            self.op = nn.Sequential(
-                nn.BatchNorm2d(C_out, affine=affine),
-                nn.ReLU(inplace=False)
-            )
 
-        def forward(self, x):
-            return self.op(x)
-else:
-    from modeling.modules import InPlaceABNSync as ABN
+class ABN(nn.Module):
+    def __init__(self, C_out, affine=False):
+        super(ABN, self).__init__()
+        self.op = nn.Sequential(
+            nn.BatchNorm2d(C_out, affine=affine),
+            nn.ReLU(inplace=False)
+        )
+
+    def forward(self, x):
+        return self.op(x)
+# else:
+#     from inplace_abn import InPlaceABNSync as ABN
+
 
 OPS = {
     'none': lambda C, stride, affine, use_ABN: Zero(stride),
@@ -41,8 +43,6 @@ class NaiveBN(nn.Module):
         )
         self._initialize_weights()
 
-
-
     def forward(self, x):
         return self.op(x)
 
@@ -63,19 +63,19 @@ class ReLUConvBN(nn.Module):
         super(ReLUConvBN, self).__init__()
         if use_ABN:
             self.op = nn.Sequential(
-                nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
+                nn.Conv2d(C_in, C_out, kernel_size, stride=stride,
+                          padding=padding, bias=False),
                 ABN(C_out)
             )
 
         else:
             self.op = nn.Sequential(
                 nn.ReLU(inplace=False),
-                nn.Conv2d(C_in, C_out, kernel_size, stride=stride, padding=padding, bias=False),
+                nn.Conv2d(C_in, C_out, kernel_size, stride=stride,
+                          padding=padding, bias=False),
                 nn.BatchNorm2d(C_out, affine=affine)
             )
         self._initialize_weights()
-
-
 
     def forward(self, x):
         return self.op(x)
@@ -91,6 +91,7 @@ class ReLUConvBN(nn.Module):
                     m.weight.data.fill_(1)
                     m.bias.data.zero_()
 
+
 class DilConv(nn.Module):
 
     def __init__(self, C_in, C_out, kernel_size, stride, padding, dilation, affine=True, seperate=True,
@@ -102,14 +103,16 @@ class DilConv(nn.Module):
                     nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding,
                               dilation=dilation,
                               groups=C_in, bias=False),
-                    nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+                    nn.Conv2d(C_in, C_out, kernel_size=1,
+                              padding=0, bias=False),
                     ABN(C_out, affine=affine),
                 )
             else:
                 self.op = nn.Sequential(
                     nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride,
                               padding=padding, dilation=dilation, bias=False),
-                    nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+                    nn.Conv2d(C_in, C_out, kernel_size=1,
+                              padding=0, bias=False),
                     ABN(C_out, affine=affine),
                 )
 
@@ -120,7 +123,8 @@ class DilConv(nn.Module):
                     nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride, padding=padding,
                               dilation=dilation,
                               groups=C_in, bias=False),
-                    nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+                    nn.Conv2d(C_in, C_out, kernel_size=1,
+                              padding=0, bias=False),
                     nn.BatchNorm2d(C_out, affine=affine),
                 )
             else:
@@ -128,12 +132,11 @@ class DilConv(nn.Module):
                     nn.ReLU(inplace=False),
                     nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=stride,
                               padding=padding, dilation=dilation, bias=False),
-                    nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
+                    nn.Conv2d(C_in, C_out, kernel_size=1,
+                              padding=0, bias=False),
                     nn.BatchNorm2d(C_out, affine=affine),
                 )
         self._initialize_weights()
-
-
 
     def forward(self, x):
         return self.op(x)
@@ -160,7 +163,8 @@ class SepConv(nn.Module):
                           bias=False),
                 nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
                 ABN(C_in, affine=affine),
-                nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
+                nn.Conv2d(C_in, C_in, kernel_size=kernel_size,
+                          stride=1, padding=padding, groups=C_in, bias=False),
                 nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
                 ABN(C_out, affine=affine)
             )
@@ -173,13 +177,12 @@ class SepConv(nn.Module):
                 nn.Conv2d(C_in, C_in, kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(C_in, affine=affine),
                 nn.ReLU(inplace=False),
-                nn.Conv2d(C_in, C_in, kernel_size=kernel_size, stride=1, padding=padding, groups=C_in, bias=False),
+                nn.Conv2d(C_in, C_in, kernel_size=kernel_size,
+                          stride=1, padding=padding, groups=C_in, bias=False),
                 nn.Conv2d(C_in, C_out, kernel_size=1, padding=0, bias=False),
                 nn.BatchNorm2d(C_out, affine=affine),
             )
         self._initialize_weights()
-
-
 
     def forward(self, x):
         return self.op(x)
@@ -195,13 +198,12 @@ class SepConv(nn.Module):
                     m.weight.data.fill_(1)
                     m.bias.data.zero_()
 
+
 class Identity(nn.Module):
 
     def __init__(self):
         super(Identity, self).__init__()
         self._initialize_weights()
-
-
 
     def forward(self, x):
         return x
@@ -210,7 +212,8 @@ class Identity(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+                if not ly.bias is None:
+                    nn.init.constant_(ly.bias, 0)
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -222,14 +225,13 @@ class Identity(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
+
 class Zero(nn.Module):
 
     def __init__(self, stride):
         super(Zero, self).__init__()
         self.stride = stride
         self._initialize_weights()
-
-
 
     def forward(self, x):
         if self.stride == 1:
@@ -248,19 +250,18 @@ class Zero(nn.Module):
                     m.bias.data.zero_()
 
 
-
 class FactorizedReduce(nn.Module):
     # TODO: why conv1 and conv2 in two parts ?
     def __init__(self, C_in, C_out, affine=True):
         super(FactorizedReduce, self).__init__()
         assert C_out % 2 == 0
         self.relu = nn.ReLU(inplace=False)
-        self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
-        self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1, stride=2, padding=0, bias=False)
+        self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1,
+                                stride=2, padding=0, bias=False)
+        self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1,
+                                stride=2, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
         self._initialize_weights()
-
-
 
     def forward(self, x):
         x = self.relu(x)
@@ -272,7 +273,8 @@ class FactorizedReduce(nn.Module):
         for ly in self.children():
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+                if not ly.bias is None:
+                    nn.init.constant_(ly.bias, 0)
 
     def _initialize_weights(self):
         for m in self.modules():
@@ -292,11 +294,12 @@ class DoubleFactorizedReduce(nn.Module):
         super(DoubleFactorizedReduce, self).__init__()
         assert C_out % 2 == 0
         self.relu = nn.ReLU(inplace=False)
-        self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1, stride=4, padding=0, bias=False)
-        self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1, stride=4, padding=0, bias=False)
+        self.conv_1 = nn.Conv2d(C_in, C_out // 2, 1,
+                                stride=4, padding=0, bias=False)
+        self.conv_2 = nn.Conv2d(C_in, C_out // 2, 1,
+                                stride=4, padding=0, bias=False)
         self.bn = nn.BatchNorm2d(C_out, affine=affine)
         self._initialize_weights()
-
 
     def forward(self, x):
         x = self.relu(x)
@@ -315,6 +318,7 @@ class DoubleFactorizedReduce(nn.Module):
                     m.weight.data.fill_(1)
                     m.bias.data.zero_()
 
+
 class FactorizedIncrease(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(FactorizedIncrease, self).__init__()
@@ -327,7 +331,6 @@ class FactorizedIncrease(nn.Module):
             nn.BatchNorm2d(out_channel)
         )
         self._initialize_weights()
-
 
     def forward(self, x):
         return self.op(x)
@@ -357,7 +360,6 @@ class DoubleFactorizedIncrease(nn.Module):
         )
         self._initialize_weights()
 
-
     def forward(self, x):
         return self.op(x)
 
@@ -385,9 +387,11 @@ class ASPP(nn.Module):
                                     nn.BatchNorm2d(in_channels),
                                     nn.ReLU())
 
-        self.concate_conv = nn.Conv2d(in_channels * 3, in_channels, 1, bias=False, stride=1, padding=0)
+        self.concate_conv = nn.Conv2d(
+            in_channels * 3, in_channels, 1, bias=False, stride=1, padding=0)
         self.concate_bn = nn.BatchNorm2d(in_channels, momentum)
-        self.final_conv = nn.Conv2d(in_channels, out_channels, 1, bias=False, stride=1, padding=0)
+        self.final_conv = nn.Conv2d(
+            in_channels, out_channels, 1, bias=False, stride=1, padding=0)
         self._initialize_weights()
 
     def forward(self, x):
@@ -396,7 +400,8 @@ class ASPP(nn.Module):
 
         # image pool and upsample
         image_pool = nn.AvgPool2d(kernel_size=x.size()[2:])
-        upsample = nn.Upsample(size=x.size()[2:], mode='bilinear', align_corners=True)
+        upsample = nn.Upsample(
+            size=x.size()[2:], mode='bilinear', align_corners=True)
         image_pool = image_pool(x)
         conv_image_pool = self.conv_p(image_pool)
         upsample = upsample(conv_image_pool)

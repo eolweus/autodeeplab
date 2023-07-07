@@ -1,8 +1,14 @@
+import warnings
+from rasterio.errors import NotGeoreferencedWarning
+
+warnings.filterwarnings("ignore", category=NotGeoreferencedWarning)
 import os
 import numpy as np
 import torch.nn as nn
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 from collections import OrderedDict
+from modeling.backbone.solis_models import autodeeplab50
 from mypath import Path
 from dataloaders import make_data_loader
 from modeling.sync_batchnorm.replicate import patch_replication_callback
@@ -12,9 +18,10 @@ from utils.lr_scheduler import LR_Scheduler
 from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
-from auto_deeplab import AutoDeeplab
+from auto_deeplab2 import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
+
 # TODO: appears that this is deprecated. Use torch.cuda.amp instead
 # https://pytorch.org/docs/stable/amp.html
 # import apex
@@ -22,7 +29,9 @@ from utils.copy_state_dict import copy_state_dict
 #     from apex import amp
 #     APEX_AVAILABLE = True
 # except ModuleNotFoundError:
-APEX_AVAILABLE = False
+#     APEX_AVAILABLE = False
+
+import random
 
 
 print('working with pytorch version {}'.format(torch.__version__))
@@ -43,7 +52,8 @@ class Trainer(object):
         # Define Tensorboard Summary
         self.summary = TensorboardSummary(self.saver.experiment_dir)
         self.writer = self.summary.create_summary()
-        self.use_amp = True if (APEX_AVAILABLE and args.use_amp) else False
+        # self.use_amp = True if (APEX_AVAILABLE and args.use_amp) else False
+        self.use_amp = args.use_amp and args.cuda
         self.opt_level = args.opt_level
 
         kwargs = {'num_workers': args.workers,
@@ -66,9 +76,13 @@ class Trainer(object):
         self.criterion = SegmentationLosses(
             weight=weight, cuda=args.cuda).build_loss(mode=args.loss_type)
 
+        # Add backbone module if specified
+        backbone_module = torch.load(
+            'pre_trainedResnet50.pt') if args.backbone == 'solis_resnet50' else None
         # Define network
         model = AutoDeeplab(self.nclass, 12, self.criterion, self.args.filter_multiplier,
-                            self.args.block_multiplier, self.args.step)
+                            self.args.block_multiplier, self.args.step, num_bands=args.num_bands, backbone_module=backbone_module)
+
         optimizer = torch.optim.SGD(
             model.weight_parameters(),
             args.lr,
@@ -94,12 +108,12 @@ class Trainer(object):
             self.model = self.model.cuda()
 
         # mixed precision
+
         if self.use_amp and args.cuda:
-            keep_batchnorm_fp32 = True if (
-                self.opt_level == 'O2' or self.opt_level == 'O3') else None
+            self.scaler = GradScaler()
 
             # fix for current pytorch version with opt_level 'O1'
-            if self.opt_level == 'O1' and torch.__version__ < '1.3':
+            if torch.__version__ < '1.3':
                 for module in self.model.modules():
                     if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
                         # Hack to fix BN fprop without affine transformation
@@ -112,13 +126,36 @@ class Trainer(object):
                                 torch.zeros(module.running_var.shape, dtype=module.running_var.dtype,
                                             device=module.running_var.device), requires_grad=False)
 
-            # print(keep_batchnorm_fp32)
-            self.model, [self.optimizer, self.architect_optimizer] = amp.initialize(
-                self.model, [self.optimizer,
-                             self.architect_optimizer], opt_level=self.opt_level,
-                keep_batchnorm_fp32=keep_batchnorm_fp32, loss_scale="dynamic")
-
             print('cuda finished')
+
+        #### OLD START ####
+        # if self.use_amp and args.cuda:
+        #     keep_batchnorm_fp32 = True if (
+        #         self.opt_level == 'O2' or self.opt_level == 'O3') else None
+
+        #     # fix for current pytorch version with opt_level 'O1'
+        #     if self.opt_level == 'O1' and torch.__version__ < '1.3':
+        #         for module in self.model.modules():
+        #             if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+        #                 # Hack to fix BN fprop without affine transformation
+        #                 if module.weight is None:
+        #                     module.weight = torch.nn.Parameter(
+        #                         torch.ones(module.running_var.shape, dtype=module.running_var.dtype,
+        #                                    device=module.running_var.device), requires_grad=False)
+        #                 if module.bias is None:
+        #                     module.bias = torch.nn.Parameter(
+        #                         torch.zeros(module.running_var.shape, dtype=module.running_var.dtype,
+        #                                     device=module.running_var.device), requires_grad=False)
+
+        #     # print(keep_batchnorm_fp32)
+        #     self.model, [self.optimizer, self.architect_optimizer] = amp.initialize(
+        #         self.model, [self.optimizer,
+        #                      self.architect_optimizer], opt_level=self.opt_level,
+        #         keep_batchnorm_fp32=keep_batchnorm_fp32, loss_scale="dynamic")
+
+        #     print('cuda finished')
+
+        #### OLD END ####
 
         # Using data parallel
         if args.cuda and len(self.args.gpu_ids) > 1:
@@ -142,6 +179,7 @@ class Trainer(object):
             if not os.path.isfile(args.resume):
                 raise RuntimeError(
                     "=> no checkpoint found at '{}'" .format(args.resume))
+            print('loading checkpoint')
             checkpoint = torch.load(args.resume)
             args.start_epoch = checkpoint['epoch']
 
@@ -162,14 +200,14 @@ class Trainer(object):
                     copy_state_dict(self.model.module.state_dict(),
                                     checkpoint['state_dict'])
                 else:
-                    # self.model.load_state_dict(checkpoint['state_dict'])
-                    copy_state_dict(self.model.state_dict(),
-                                    checkpoint['state_dict'])
+                    self.model.load_state_dict(checkpoint['state_dict'])
+                    # copy_state_dict(self.model.state_dict(),
+                    #                 checkpoint['state_dict'])
 
             if not args.ft:
-                # self.optimizer.load_state_dict(checkpoint['optimizer'])
-                copy_state_dict(self.optimizer.state_dict(),
-                                checkpoint['optimizer'])
+                self.optimizer.load_state_dict(checkpoint['optimizer'])
+                # copy_state_dict(self.optimizer.state_dict(),
+                #                 checkpoint['optimizer'])
             self.best_pred = checkpoint['best_pred']
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
@@ -184,35 +222,59 @@ class Trainer(object):
         tbar = tqdm(self.train_loaderA)
         num_img_tr = len(self.train_loaderA)
         for i, sample in enumerate(tbar):
-            image, target = sample['image'], sample['label']
+            if self.args.dataset == 'solis':
+                image, target = sample
+            else:
+                image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
             self.scheduler(self.optimizer, i, epoch, self.best_pred)
             self.optimizer.zero_grad()
             output = self.model(image)
             loss = self.criterion(output, target)
+            # if self.use_amp:
+            #     with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+            #         scaled_loss.backward()
+            # else:
+            #     loss.backward()
+            # self.optimizer.step()
+            with autocast(enabled=self.use_amp):
+                loss = self.criterion(output, target)
             if self.use_amp:
-                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                    scaled_loss.backward()
+                self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
             else:
                 loss.backward()
-            self.optimizer.step()
+                self.optimizer.step()
 
             if epoch >= self.args.alpha_epoch:
                 search = next(iter(self.train_loaderB))
-                image_search, target_search = search['image'], search['label']
+                if self.args.dataset == 'solis':
+                    image_search, target_search = search
+                else:
+                    image_search, target_search = search['image'], search['label']
                 if self.args.cuda:
                     image_search, target_search = image_search.cuda(), target_search.cuda()
 
                 self.architect_optimizer.zero_grad()
                 output_search = self.model(image_search)
                 arch_loss = self.criterion(output_search, target_search)
+                # if self.use_amp:
+                #     with amp.scale_loss(arch_loss, self.architect_optimizer) as arch_scaled_loss:
+                #         arch_scaled_loss.backward()
+                # else:
+                #     arch_loss.backward()
+                # self.architect_optimizer.step()
+                with autocast(enabled=self.use_amp):
+                    arch_loss = self.criterion(output_search, target_search)
                 if self.use_amp:
-                    with amp.scale_loss(arch_loss, self.architect_optimizer) as arch_scaled_loss:
-                        arch_scaled_loss.backward()
+                    self.scaler.scale(arch_loss).backward()
+                    self.scaler.step(self.architect_optimizer)
+                    self.scaler.update()
                 else:
                     arch_loss.backward()
-                self.architect_optimizer.step()
+                    self.architect_optimizer.step()
 
             train_loss += loss.item()
             tbar.set_description('Train loss: %.3f' % (train_loss / (i + 1)))
@@ -251,7 +313,10 @@ class Trainer(object):
         test_loss = 0.0
 
         for i, sample in enumerate(tbar):
-            image, target = sample['image'], sample['label']
+            if self.args.dataset == 'solis':
+                image, target = sample
+            else:
+                image, target = sample['image'], sample['label']
             if self.args.cuda:
                 image, target = image.cuda(), target.cuda()
             with torch.no_grad():
@@ -270,31 +335,37 @@ class Trainer(object):
         Acc_class = self.evaluator.Pixel_Accuracy_Class()
         mIoU = self.evaluator.Mean_Intersection_over_Union()
         FWIoU = self.evaluator.Frequency_Weighted_Intersection_over_Union()
+        F1 = self.evaluator.F1_score() if self.args.dataset == 'solis' else None
         self.writer.add_scalar('val/total_loss_epoch', test_loss, epoch)
         self.writer.add_scalar('val/mIoU', mIoU, epoch)
         self.writer.add_scalar('val/Acc', Acc, epoch)
         self.writer.add_scalar('val/Acc_class', Acc_class, epoch)
         self.writer.add_scalar('val/fwIoU', FWIoU, epoch)
+        if self.args.dataset == 'solis':
+            self.writer.add_scalar('val/F1', F1, epoch)
         print('Validation:')
         print('[Epoch: %d, numImages: %5d]' %
               (epoch, i * self.args.batch_size + image.data.shape[0]))
-        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}".format(
-            Acc, Acc_class, mIoU, FWIoU))
+        print("Acc:{}, Acc_class:{}, mIoU:{}, fwIoU: {}, F1: {}".format(
+            Acc, Acc_class, mIoU, FWIoU, F1))
         print('Loss: %.3f' % test_loss)
         new_pred = mIoU
         if new_pred > self.best_pred:
             is_best = True
             self.best_pred = new_pred
-            if torch.cuda.device_count() > 1:
-                state_dict = self.model.module.state_dict()
-            else:
-                state_dict = self.model.state_dict()
-            self.saver.save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': state_dict,
-                'optimizer': self.optimizer.state_dict(),
-                'best_pred': self.best_pred,
-            }, is_best)
+        else:
+            is_best = False
+        # save checkpoint every epoch
+        if torch.cuda.device_count() > 1:
+            state_dict = self.model.module.state_dict()
+        else:
+            state_dict = self.model.state_dict()
+        self.saver.save_checkpoint({
+            'epoch': epoch + 1,
+            'state_dict': state_dict,
+            'optimizer': self.optimizer.state_dict(),
+            'best_pred': self.best_pred,
+        }, is_best)
 
 
 def main():
@@ -336,6 +407,7 @@ def main():
         args.checkname = 'deeplab-' + str(args.backbone)
     print(args)
     torch.manual_seed(args.seed)
+    random.seed(args.seed)
     trainer = Trainer(args)
     print('Starting Epoch:', trainer.args.start_epoch)
     print('Total Epoches:', trainer.args.epochs)
