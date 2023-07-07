@@ -19,8 +19,6 @@ from utils.saver import Saver
 from utils.summaries import TensorboardSummary
 from utils.metrics import Evaluator
 from auto_deeplab2 import AutoDeeplab
-# TODO: remember to use this instead of the auto_deeplab2
-# from auto_deeplab import AutoDeeplab
 from config_utils.search_args import obtain_search_args
 from utils.copy_state_dict import copy_state_dict
 
